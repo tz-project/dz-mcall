@@ -1,0 +1,43 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch mcall",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/mcall.go",
+            "args": ["web"],
+            "env": {},
+            "args": ["-w", "-p", "3000"],
+            "showLog": true
+        },
+        {
+            "name": "Launch mcall with command",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/mcall.go",
+            "args": ["-i", "ls -al", "-t", "cmd"],
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "Attach to Process",
+            "type": "go",
+            "request": "attach",
+            "mode": "local",
+            "processId": 0
+        },
+        {
+            "name": "Launch mcall with mcall.yaml",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/mcall.go",
+            "args": ["-c", "etc/mcall.yaml"],
+            "env": {},
+            "showLog": true
+        }
+    ]
+}

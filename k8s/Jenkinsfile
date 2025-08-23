@@ -1,0 +1,143 @@
+pipeline {
+   agent any
+
+   environment {
+        GIT_URL = "https://github.com/doohee323/tz-mcall.git"
+        TAG_ID = "${env.BRANCH_NAME == "main" ? "main-${env.BUILD_NUMBER}" : env.BRANCH_NAME == "qa" ? "qa-${env.BUILD_NUMBER}" : "${env.BUILD_NUMBER}"}"
+        DOCKER_NAME = "tz-mcall"    // DOCKER_NAME
+        APP_NAME = "tz-mcall"
+        STAGING = "${env.BRANCH_NAME == "main" ? "prod" : env.BRANCH_NAME == "qa" ? "qa" : "dev"}"
+        NAMESPACE = "${env.BRANCH_NAME == "main" || env.BRANCH_NAME == "qa" ? "devops" : "devops-dev"}"
+        DOCKER_FILE = "Dockerfile"  // Updated to use the refactored Dockerfile
+        BRANCH_ROLLOUT = "true" // optional) default: false
+        K8S_SOURCE = "${env.BRANCH_NAME == "main" ? "k8s.yaml" : env.BRANCH_NAME == "block" || env.BRANCH_NAME == "access" ? "k8s-crontab.yaml" : "k8s-dev.yaml"}"
+        K8S_FILE = "k8s.yaml"
+
+        // *** for changing cluster ***
+        AWS_REGION = "ap-northeast-2"
+        CLUSTER_NAME = "eks-main-s"
+        DOMAIN_NAME = "tzcorp.com"
+        ACCOUNT_ID = "xxxxxxxx"
+
+        // *** fixed variables ***
+        GIT_BRANCH = "${env.GIT_BRANCH}"
+        GIT_CREDENTIAL = 'Github'
+        KUBECTL = "kubectl -n " + "${NAMESPACE}" + " --kubeconfig /var/lib/jenkins/.kube/tz_" + "${CLUSTER_NAME}"
+        REPO_HOST = "${ACCOUNT_ID}" +".dkr.ecr." + "${AWS_REGION}" + ".amazonaws.com"
+        IMAGE_TAG = "${DOCKER_NAME}:${GIT_BRANCH}-${TAG_ID}"
+        REPOSITORY_TAG = "${REPO_HOST}/${IMAGE_TAG}"
+        REPO_HOST_URL = "https://" + "${REPO_HOST}"
+        REGISTRY_CREDENTIAL = 'jenkins-aws-secret'
+        AWS_ACCESS_KEY_ID     = credentials('jenkins-aws-secret-key-id')
+        AWS_SECRET_ACCESS_KEY = credentials('jenkins-aws-secret-access-key')
+        DEVOPS_ADMIN_PASSWORD = credentials('devops_admin_password')
+   }
+
+   stages {
+      stage('Preparation') {
+         steps {
+            cleanWs()
+            git credentialsId: GIT_CREDENTIAL,
+            url: GIT_URL,
+            branch: GIT_BRANCH
+         }
+      }
+
+      stage('Copy Yaml') {
+         steps {
+            dir("${workspace}"){
+                script{
+                    echo "Copying Kubernetes configuration: ${K8S_SOURCE} -> ${K8S_FILE}"
+                    sh "cp -f k8s/${K8S_SOURCE} ./${K8S_FILE}"
+                    echo "Copying Dockerfile: ${DOCKER_FILE} -> ./Dockerfile"
+                    sh "cp -f ${DOCKER_FILE} ./Dockerfile"
+                }
+            }
+         }
+      }
+
+      stage('Configuration') {
+         steps {
+            dir("${workspace}"){
+                script{
+                    echo "Running configuration script for branch: ${GIT_BRANCH}, staging: ${STAGING}"
+                    sh "bash ./k8s/config.sh ${GIT_BRANCH} ${STAGING}"
+                }
+            }
+         }
+      }
+
+      stage('Build') {
+         steps {
+            dir("${workspace}"){
+                script{
+                    echo "Building Docker image: ${REPOSITORY_TAG}"
+                    sh "bash /var/lib/jenkins/k8s.sh build"
+                }
+            }
+         }
+      }
+
+      stage('Push Image') {
+         steps {
+            script {
+                echo "Pushing Docker image to registry"
+                sh "bash /var/lib/jenkins/k8s.sh push"
+            }
+         }
+      }
+
+      stage('Deploy the service to Cluster') {
+        steps {
+            script {
+                echo "Deploying to Kubernetes cluster: ${CLUSTER_NAME}, namespace: ${NAMESPACE}"
+                sh "bash /var/lib/jenkins/k8s.sh apply"
+            }
+        }
+      }
+
+      stage('Verify deployment') {
+         steps{
+            script {
+                echo "Verifying deployment status"
+                sh "bash /var/lib/jenkins/k8s.sh verify"
+            }
+         }
+      }
+
+//       stage('Email'){
+//         steps {
+//             script {
+//                 env.GIT_COMMIT_MSG = sh (script: 'git log -1 --pretty=%B ${GIT_COMMIT}', returnStdout: true).trim()
+//                 env.GIT_AUTHOR = sh (script: 'git log -1 --pretty=%cn ${GIT_COMMIT}', returnStdout: true).trim()
+//                 env.GIT_COMMIT_EMAIL = sh (script: 'git log --format="%ae" | head -1', returnStdout: true).trim()
+//             }
+//           emailext attachLog: true, body: "${currentBuild.currentResult}: Job ${env.JOB_NAME} build ${env.BUILD_NUMBER}\n More info at: ${env.BUILD_URL}",
+//             subject: "Jenkins Build ${currentBuild.currentResult}: Job ${env.JOB_NAME} ( ${GIT_AUTHOR} ) - ${GIT_COMMIT_MSG}",
+//             to: "${GIT_COMMIT_EMAIL}"
+//         }
+//       }
+
+//       stage('Send slack') {
+//         steps{
+//             script {
+//                 echo "Sending Slack notification"
+//                 sh "bash /var/lib/jenkins/k8s.sh slack"
+//             }
+//         }
+//       }
+   }
+
+   post {
+      always {
+         echo "Pipeline completed with status: ${currentBuild.currentResult}"
+      }
+      success {
+         echo "Deployment successful for ${GIT_BRANCH} to ${STAGING}"
+      }
+      failure {
+         echo "Deployment failed for ${GIT_BRANCH} to ${STAGING}"
+      }
+   }
+}
+

@@ -1,0 +1,70 @@
+request:
+    #    type: post
+    #    type: get
+    #    input: |
+    #       {"inputs":[{"input":"http://google.com/config","id":"aaa","pswd":"bbb"},
+    #                      {"input":"http://google.com/bbb","id":"aaa","pswd":"bbb"}]}
+
+    #    type: cmd
+    #    input: |
+    #        {"inputs":[{"input":"ls -al"},{"input":"pwd"}]}
+
+    subject: "block_access"
+    timeout: 3
+    input: |
+        {
+            "inputs":
+                [
+                    {"name": "jenkins", "type":"get", "input":"http://jenkins.tzcorp.com/"},
+                    {"name": "tzcorp-dev-redis", "type":"cmd", "input":"telnet redis-dev.tzcorp.com 6379"}
+                ]
+        }
+
+response:
+    format: json    # plan, json
+    #    encoding:
+    #        type: url   # std, url
+    es:
+        host: es.elk.eks-main-s.tzcorp.com
+        id: elastic
+        password: DEVOPS_ADMIN_PASSWORD
+        index_name: sample_data
+
+#admin_password='elastic:DEVOPS_ADMIN_PASSWORD'
+#esUrl=es.elk.eks-main-s.tzcorp.com
+#indexName=sample_data
+#curl -XDELETE -u ${admin_password} ${esUrl}/${indexName}
+#curl -XPUT -u ${admin_password} ${esUrl}/${indexName} -H 'Content-Type: application/json'
+#-d '{
+#    "mappings": {
+#        "properties": {
+#            "errorCode": {
+#                "type": "integer"
+#            },
+#            "input": {
+#                "type": "text"
+#            },
+#            "result": {
+#                "type": "text"
+#            },
+#            "ts": {
+#                "type": "date"
+#                "format":"yyyy-MM-dd'T'HH:mm:ss.SSS"
+#            }
+#        }
+#    }
+#}'
+#curl -XPOST -u ${admin_password} ${esUrl}/${indexName}/doc -H "Content-Type: application/json" -d @test.json
+
+worker:
+    number: 10
+
+log:
+    level: debug
+    file: /app/log/mcall.log
+
+webserver:
+    enable: false
+    host: 0.0.0.0
+    port: 3000
+

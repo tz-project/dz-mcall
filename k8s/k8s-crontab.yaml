@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tz-mcall-${GIT_BRANCH}
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: ${STAGING}
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            org: tz
+            team: devops
+            project: mcall
+            environment: ${STAGING}
+            app: tz-mcall-${GIT_BRANCH}
+        spec:
+          restartPolicy: OnFailure
+          imagePullSecrets:
+            - name: tz-registrykey
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+            - name: tz-mcall-${GIT_BRANCH}
+              image: ${REPOSITORY_TAG}
+              imagePullPolicy: Always
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "256Mi"
+                  cpu: "200m"
+              env:
+              - name: GIT_BRANCH
+                value: ${GIT_BRANCH}
+              - name: CONTAINER_ENV
+                value: 'kubernetes'
+              volumeMounts:
+              - name: config-volume
+                mountPath: /app/etc
+                readOnly: true
+              - name: logs-volume
+                mountPath: /var/log/mcall
+          volumes:
+          - name: config-volume
+            configMap:
+              name: tz-mcall-config-${GIT_BRANCH}
+          - name: logs-volume
+            emptyDir: {}

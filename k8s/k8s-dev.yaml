@@ -1,0 +1,192 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tz-mcall-${GIT_BRANCH}
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: ${STAGING}
+spec:
+  selector:
+    matchLabels:
+      app: tz-mcall-${GIT_BRANCH}
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        org: tz
+        team: devops
+        project: mcall
+        environment: ${STAGING}
+        app: tz-mcall-${GIT_BRANCH}
+    spec:
+      imagePullSecrets:
+        - name: tz-registrykey
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: tz-mcall-${GIT_BRANCH}
+        image: ${REPOSITORY_TAG}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        env:
+        - name: GIT_BRANCH
+          valueFrom:
+            configMapKeyRef:
+              name: tz-mcall-${GIT_BRANCH}
+              key: GIT_BRANCH
+        - name: CONTAINER_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: tz-mcall-${GIT_BRANCH}
+              key: container_env
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/etc
+          readOnly: true
+        - name: logs-volume
+          mountPath: /var/log/mcall
+      volumes:
+      - name: config-volume
+        configMap:
+          name: tz-mcall-config-${GIT_BRANCH}
+      - name: logs-volume
+        emptyDir: {}
+      nodeSelector:
+        team: devops
+        environment: ${STAGING}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tz-mcall-${GIT_BRANCH}
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: ${STAGING}
+spec:
+  selector:
+    app: tz-mcall-${GIT_BRANCH}
+  type: NodePort
+  ports:
+    - port: 3000
+      name: http
+      targetPort: 3000
+      protocol: TCP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tz-mcall-${GIT_BRANCH}
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: ${STAGING}
+data:
+  GIT_BRANCH: ${GIT_BRANCH}
+  container_env: 'kubernetes'
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tz-mcall-config-${GIT_BRANCH}
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: ${STAGING}
+data:
+  mcall.yaml: |
+    request:
+      type: cmd
+      input: |
+        {
+          "inputs": [
+            {"input": "pwd"},
+            {"input": "ls -la"}
+          ]
+        }
+    response:
+      format: json
+    worker:
+      number: 3
+    log:
+      level: debug
+      file: /var/log/mcall/mcall.log
+    webserver:
+      enable: true
+      host: 0.0.0.0
+      port: 3000
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tz-mcall-${GIT_BRANCH}
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: ${STAGING}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/healthcheck-path: /healthcheck
+    nginx.ingress.kubernetes.io/healthcheck-port: '3000'
+spec:
+  rules:
+  - host: ${GIT_BRANCH}.mcall.${DOMAIN_NAME}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tz-mcall-${GIT_BRANCH}
+            port:
+              number: 3000
+  tls:
+    - hosts:
+        - ${GIT_BRANCH}.mcall.${DOMAIN_NAME}
+      secretName: tz-mcall-${GIT_BRANCH}

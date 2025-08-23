@@ -1,0 +1,13 @@
+package: .
+owners:
+- name: Dewey Hong
+  email: doohee323@gmail.com
+import:
+- package: github.com/op/go-logging
+- package: github.com/gorilla/pat
+- package: github.com/spf13/viper
+- package: github.com/stretchr/testify
+  subpackages:
+  - assert
+  - require
+

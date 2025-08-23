@@ -1,0 +1,13 @@
+Package: tz-mcall
+Version: 2.0.0
+Section: misc
+Priority: optional
+Architecture: amd64
+Maintainer: "TOPZONE" <doohee323@gmail.com>
+Description: Concurrence with golang for multiple request (HTTP) or shell command.
+ 2.0.0 : Refactored version with improved code structure
+  - Support for YAML configuration files
+  - Enhanced error handling and logging
+  - Multiple input support with comma separation
+  - HTTP request type handling (GET, POST, CMD)
+  - Improved command line argument processing

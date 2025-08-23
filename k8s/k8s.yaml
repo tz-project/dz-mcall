@@ -1,0 +1,228 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tz-mcall
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: prod
+spec:
+  selector:
+    matchLabels:
+      app: tz-mcall
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        org: tz
+        team: devops
+        project: mcall
+        environment: prod
+        app: tz-mcall
+    spec:
+      imagePullSecrets:
+        - name: tz-registrykey
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: tz-mcall
+        image: ${REPOSITORY_TAG}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        env:
+        - name: GIT_BRANCH
+          valueFrom:
+            configMapKeyRef:
+              name: tz-mcall
+              key: GIT_BRANCH
+        - name: CONTAINER_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: tz-mcall
+              key: container_env
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/etc
+          readOnly: true
+        - name: logs-volume
+          mountPath: /var/log/mcall
+      volumes:
+      - name: config-volume
+        configMap:
+          name: tz-mcall-config
+      - name: logs-volume
+        emptyDir: {}
+      nodeSelector:
+        team: devops
+        environment: prod
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tz-mcall
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: prod
+spec:
+  selector:
+    app: tz-mcall
+  type: NodePort
+  ports:
+    - port: 3000
+      name: http
+      targetPort: 3000
+      protocol: TCP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tz-mcall
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: prod
+data:
+  GIT_BRANCH: ${GIT_BRANCH}
+  container_env: 'kubernetes'
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tz-mcall-config
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: prod
+data:
+  mcall.yaml: |
+    request:
+      type: cmd
+      input: |
+        {
+          "inputs": [
+            {"input": "pwd"},
+            {"input": "ls -la"}
+          ]
+        }
+    response:
+      format: json
+    worker:
+      number: 5
+    log:
+      level: info
+      file: /var/log/mcall/mcall.log
+    webserver:
+      enable: true
+      host: 0.0.0.0
+      port: 3000
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tz-mcall
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: prod
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/actions.redirect-to-https: >
+        {"Type":"redirect","RedirectConfig":{"Port":"443","Protocol":"HTTPS","StatusCode":"HTTP_302"}}
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:${AWS_REGION}:${ACCOUNT_ID}:certificate/${CERTIFICATE}
+    alb.ingress.kubernetes.io/healthcheck-path: /healthcheck
+    alb.ingress.kubernetes.io/healthcheck-port: '3000'
+spec:
+  rules:
+  - host: api.${DOMAIN_NAME}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tz-mcall
+            port:
+              number: 3000
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tz-mcall
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tz-mcall
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
