@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tz-mcall-${GIT_BRANCH}
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: ${STAGING}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tz-mcall-${GIT_BRANCH}
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: ${STAGING}
+rules:
+# Leader election permissions
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Pod listing permissions for task distribution
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+# ConfigMap permissions for task assignment
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tz-mcall-${GIT_BRANCH}
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: ${STAGING}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tz-mcall-${GIT_BRANCH}
+subjects:
+- kind: ServiceAccount
+  name: tz-mcall-${GIT_BRANCH}
+  namespace: ${NAMESPACE}

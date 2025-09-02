@@ -9,11 +9,13 @@ metadata:
     environment: ${STAGING}
 spec:
   schedule: "*/5 * * * *"
-  concurrencyPolicy: Forbid
+  concurrencyPolicy: Allow
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      parallelism: ${PARALLELISM:-3}  # Number of pods to run simultaneously (default: 3)
+      completions: ${COMPLETIONS:-3}  # Number of pods that must complete (default: 3)
       template:
         metadata:
           labels:
@@ -24,6 +26,7 @@ spec:
             app: tz-mcall-${GIT_BRANCH}
         spec:
           restartPolicy: OnFailure
+          serviceAccountName: tz-mcall-${GIT_BRANCH}
           imagePullSecrets:
             - name: tz-registrykey
           securityContext:
@@ -46,6 +49,16 @@ spec:
                 value: ${GIT_BRANCH}
               - name: CONTAINER_ENV
                 value: 'kubernetes'
+              - name: LEADER_ELECTION
+                value: 'true'
+              - name: NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: HOSTNAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
               volumeMounts:
               - name: config-volume
                 mountPath: /app/etc

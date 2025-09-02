@@ -23,6 +23,13 @@ import (
 	"github.com/gorilla/pat"
 	"github.com/op/go-logging"
 	"github.com/spf13/viper"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -96,14 +103,18 @@ type Config struct {
 
 // App represents the main application
 type App struct {
-	config    *Config
-	logger    *logging.Logger
-	workerNum int
-	timeout   int
-	subject   string
-	format    string
-	base64    string
-	esConfig  ESConfig
+	config         *Config
+	logger         *logging.Logger
+	workerNum      int
+	timeout        int
+	subject        string
+	format         string
+	base64         string
+	esConfig       ESConfig
+	clientset      *kubernetes.Clientset
+	leaderElection bool
+	namespace      string
+	lockName       string
 }
 
 // ESConfig holds Elasticsearch configuration
@@ -682,6 +693,8 @@ func NewApp(config *Config) *App {
 			Password:  config.Response.ES.Password,
 			IndexName: config.Response.ES.IndexName,
 		},
+		namespace: "default",
+		lockName:  "tz-mcall-leader",
 	}
 
 	// Set defaults
@@ -781,6 +794,362 @@ func loadConfig(configFile string) (*Config, error) {
 // Args represents command line arguments
 type Args map[string]interface{}
 
+// createKubernetesClient creates a Kubernetes client
+func (app *App) createKubernetesClient() error {
+	var config *rest.Config
+	var err error
+
+	// Try in-cluster config first
+	if config, err = rest.InClusterConfig(); err != nil {
+		// Fallback to kubeconfig
+		kubeconfig := os.Getenv("KUBECONFIG")
+		if kubeconfig == "" {
+			kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+		}
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return fmt.Errorf("failed to create kubernetes config: %w", err)
+		}
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	app.clientset = clientset
+	return nil
+}
+
+// runLeaderElection runs the leader election process
+func (app *App) runLeaderElection(ctx context.Context) error {
+	if !app.leaderElection {
+		// If leader election is disabled, run directly
+		return app.runAsLeader(ctx)
+	}
+
+	// Get pod name for leader election identity
+	podName := os.Getenv("HOSTNAME")
+	if podName == "" {
+		podName = "mcall-pod"
+	}
+
+	// Create leader election lock
+	lock := &resourcelock.LeaseLock{
+		LeaseMeta: metav1.ObjectMeta{
+			Name:      app.lockName,
+			Namespace: app.namespace,
+		},
+		Client: app.clientset.CoordinationV1(),
+		LockConfig: resourcelock.ResourceLockConfig{
+			Identity: podName,
+		},
+	}
+
+	// Configure leader election
+	lec := leaderelection.LeaderElectionConfig{
+		Lock: lock,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				app.logger.Infof("Pod %s became the leader", podName)
+				app.runAsLeader(ctx)
+			},
+			OnStoppedLeading: func() {
+				app.logger.Infof("Pod %s lost leadership", podName)
+			},
+			OnNewLeader: func(identity string) {
+				if identity == podName {
+					app.logger.Infof("Pod %s is the new leader", podName)
+				} else {
+					app.logger.Infof("New leader elected: %s", identity)
+				}
+			},
+		},
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 10 * time.Second,
+		RetryPeriod:   2 * time.Second,
+	}
+
+	// Start worker logic in a separate goroutine
+	go func() {
+		workerCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		
+		// Handle shutdown signals for worker
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-sigCh
+			app.logger.Info("Received shutdown signal, cancelling worker context")
+			cancel()
+		}()
+
+		if err := app.runAsWorker(workerCtx); err != nil {
+			app.logger.Errorf("Worker failed: %v", err)
+		}
+	}()
+
+	// Run leader election
+	leaderelection.RunOrDie(ctx, lec)
+	return nil
+}
+
+// runAsLeader runs the main logic when this pod is the leader
+func (app *App) runAsLeader(ctx context.Context) error {
+	app.logger.Info("Running as leader - starting task distribution")
+
+	// Create a ticker for periodic task execution
+	ticker := time.NewTicker(5 * time.Minute) // Run every 5 minutes
+	defer ticker.Stop()
+
+	// Run initial task
+	if err := app.distributeTasks(ctx); err != nil {
+		app.logger.Errorf("Failed to distribute tasks: %v", err)
+	}
+
+	// Run periodic tasks
+	for {
+		select {
+		case <-ctx.Done():
+			app.logger.Info("Leader context cancelled, stopping task distribution")
+			return ctx.Err()
+		case <-ticker.C:
+			if err := app.distributeTasks(ctx); err != nil {
+				app.logger.Errorf("Failed to distribute tasks: %v", err)
+			}
+		}
+	}
+}
+
+// distributeTasks distributes tasks to worker pods
+func (app *App) distributeTasks(ctx context.Context) error {
+	app.logger.Info("Distributing tasks to worker pods")
+
+	// Get list of available pods
+	pods, err := app.clientset.CoreV1().Pods(app.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "app=tz-mcall",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list pods: %w", err)
+	}
+
+	// Filter out the leader pod
+	var workerPods []string
+	for _, pod := range pods.Items {
+		if pod.Name != os.Getenv("HOSTNAME") && pod.Status.Phase == "Running" {
+			workerPods = append(workerPods, pod.Name)
+		}
+	}
+
+	app.logger.Infof("Found %d worker pods: %v", len(workerPods), workerPods)
+
+	// Create tasks to distribute
+	tasks := app.generateTasks()
+
+	// Distribute tasks among worker pods
+	for i, task := range tasks {
+		if len(workerPods) == 0 {
+			app.logger.Warning("No worker pods available")
+			break
+		}
+
+		workerPod := workerPods[i%len(workerPods)]
+		if err := app.assignTaskToPod(ctx, workerPod, task); err != nil {
+			app.logger.Errorf("Failed to assign task to pod %s: %v", workerPod, err)
+		}
+	}
+
+	return nil
+}
+
+// generateTasks generates tasks to be distributed
+func (app *App) generateTasks() []map[string]interface{} {
+	// This is where you would generate your actual tasks
+	// For now, we'll create some sample tasks
+	tasks := []map[string]interface{}{
+		{
+			"id":      "task-1",
+			"command": "echo 'Hello from task 1'",
+			"type":    "cmd",
+		},
+		{
+			"id":      "task-2", 
+			"command": "echo 'Hello from task 2'",
+			"type":    "cmd",
+		},
+		{
+			"id":      "task-3",
+			"command": "echo 'Hello from task 3'",
+			"type":    "cmd",
+		},
+	}
+
+	// If config has input tasks, use those instead
+	if app.config.Request.Input != "" {
+		inputs, types, names := app.parseConfigInput(app.config.Request.Input)
+		tasks = make([]map[string]interface{}, len(inputs))
+		for i, input := range inputs {
+			taskType := RequestTypeCmd
+			if i < len(types) {
+				taskType = types[i]
+			}
+			taskName := app.subject
+			if i < len(names) {
+				taskName = names[i]
+			}
+
+			tasks[i] = map[string]interface{}{
+				"id":      fmt.Sprintf("task-%d", i+1),
+				"command": input,
+				"type":    taskType,
+				"name":    taskName,
+			}
+		}
+	}
+
+	return tasks
+}
+
+// assignTaskToPod assigns a task to a specific pod
+func (app *App) assignTaskToPod(ctx context.Context, podName string, task map[string]interface{}) error {
+	// Create a ConfigMap to store the task
+	taskName := fmt.Sprintf("task-%s-%d", podName, time.Now().Unix())
+	
+	taskData, err := json.Marshal(task)
+	if err != nil {
+		return fmt.Errorf("failed to marshal task: %w", err)
+	}
+
+	configMap := &metav1.ObjectMeta{
+		Name:      taskName,
+		Namespace: app.namespace,
+		Labels: map[string]string{
+			"app":        "tz-mcall",
+			"task":       "true",
+			"assigned-to": podName,
+		},
+		Annotations: map[string]string{
+			"task-data": string(taskData),
+		},
+	}
+
+	// Create the ConfigMap
+	_, err = app.clientset.CoreV1().ConfigMaps(app.namespace).Create(ctx, &v1.ConfigMap{
+		ObjectMeta: *configMap,
+	}, metav1.CreateOptions{})
+	
+	if err != nil {
+		return fmt.Errorf("failed to create task ConfigMap: %w", err)
+	}
+
+	app.logger.Infof("Assigned task %s to pod %s", task["id"], podName)
+	return nil
+}
+
+// runAsWorker runs the worker logic to process assigned tasks
+func (app *App) runAsWorker(ctx context.Context) error {
+	app.logger.Info("Running as worker - monitoring for assigned tasks")
+	
+	podName := os.Getenv("HOSTNAME")
+	if podName == "" {
+		podName = "mcall-pod"
+	}
+
+	// Create a ticker to check for new tasks
+	ticker := time.NewTicker(30 * time.Second) // Check every 30 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			app.logger.Info("Worker context cancelled, stopping task monitoring")
+			return ctx.Err()
+		case <-ticker.C:
+			if err := app.processAssignedTasks(ctx, podName); err != nil {
+				app.logger.Errorf("Failed to process assigned tasks: %v", err)
+			}
+		}
+	}
+}
+
+// processAssignedTasks processes tasks assigned to this worker pod
+func (app *App) processAssignedTasks(ctx context.Context, podName string) error {
+	// List ConfigMaps assigned to this pod
+	configMaps, err := app.clientset.CoreV1().ConfigMaps(app.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("app=tz-mcall,task=true,assigned-to=%s", podName),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list assigned tasks: %w", err)
+	}
+
+	app.logger.Debugf("Found %d assigned tasks", len(configMaps.Items))
+
+	for _, cm := range configMaps.Items {
+		// Check if task is already processed
+		if cm.Annotations["processed"] == "true" {
+			continue
+		}
+
+		// Get task data
+		taskData := cm.Annotations["task-data"]
+		if taskData == "" {
+			app.logger.Warningf("Task ConfigMap %s has no task data", cm.Name)
+			continue
+		}
+
+		var task map[string]interface{}
+		if err := json.Unmarshal([]byte(taskData), &task); err != nil {
+			app.logger.Errorf("Failed to unmarshal task data: %v", err)
+			continue
+		}
+
+		// Process the task
+		app.logger.Infof("Processing task %s", task["id"])
+		if err := app.executeTask(task); err != nil {
+			app.logger.Errorf("Failed to execute task %s: %v", task["id"], err)
+		}
+
+		// Mark task as processed
+		cm.Annotations["processed"] = "true"
+		cm.Annotations["processed-at"] = time.Now().Format(time.RFC3339)
+		cm.Annotations["processed-by"] = podName
+
+		_, err = app.clientset.CoreV1().ConfigMaps(app.namespace).Update(ctx, &cm, metav1.UpdateOptions{})
+		if err != nil {
+			app.logger.Errorf("Failed to mark task as processed: %v", err)
+		} else {
+			app.logger.Infof("Task %s completed and marked as processed", task["id"])
+		}
+	}
+
+	return nil
+}
+
+// executeTask executes a single task
+func (app *App) executeTask(task map[string]interface{}) error {
+	taskID := task["id"].(string)
+	command := task["command"].(string)
+	taskType := task["type"].(string)
+	taskName := task["name"].(string)
+
+	app.logger.Infof("Executing task %s: %s", taskID, command)
+
+	// Create a single-item slice for the existing execCmd method
+	inputs := []string{command}
+	types := []string{taskType}
+	names := []string{taskName}
+
+	// Execute the task using existing logic
+	results := app.execCmd(inputs, types, names)
+	
+	// Log the result
+	for _, result := range results {
+		app.logger.Infof("Task %s result: %s", taskID, result["result"])
+	}
+
+	return nil
+}
+
 // mainExec is the main execution logic
 func mainExec(args Args) error {
 	config, err := loadConfig(args["c"].(string))
@@ -817,6 +1186,12 @@ func mainExec(args Args) error {
 		app.base64 = base64
 	}
 
+	// Check if leader election is enabled (via environment variable)
+	app.leaderElection = os.Getenv("LEADER_ELECTION") == "true"
+	if namespace := os.Getenv("NAMESPACE"); namespace != "" {
+		app.namespace = namespace
+	}
+
 	// Set runtime configuration
 	numCPUs := runtime.NumCPU()
 	runtime.GOMAXPROCS(numCPUs)
@@ -825,10 +1200,36 @@ func mainExec(args Args) error {
 	app.logger.Debugf("Web server enabled: %v", config.WebServer.Enable)
 	app.logger.Debugf("HTTP host: %s", config.WebServer.Host)
 	app.logger.Debugf("HTTP port: %s", config.WebServer.Port)
+	app.logger.Debugf("Leader election enabled: %v", app.leaderElection)
+	app.logger.Debugf("Namespace: %s", app.namespace)
+
+	// If leader election is enabled, set up Kubernetes client
+	if app.leaderElection {
+		if err := app.createKubernetesClient(); err != nil {
+			app.logger.Errorf("Failed to create Kubernetes client: %v", err)
+			app.logger.Info("Falling back to non-leader election mode")
+			app.leaderElection = false
+		}
+	}
 
 	// Run application
 	if config.WebServer.Enable {
 		app.webserver()
+	} else if app.leaderElection {
+		// Run with leader election
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Handle shutdown signals
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-sigCh
+			app.logger.Info("Received shutdown signal, cancelling context")
+			cancel()
+		}()
+
+		return app.runLeaderElection(ctx)
 	} else {
 		// Handle command line input or config file input
 		var inputs []string
