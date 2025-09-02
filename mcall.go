@@ -23,13 +23,13 @@ import (
 	"github.com/gorilla/pat"
 	"github.com/op/go-logging"
 	"github.com/spf13/viper"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -874,7 +874,7 @@ func (app *App) runLeaderElection(ctx context.Context) error {
 	go func() {
 		workerCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		
+
 		// Handle shutdown signals for worker
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
@@ -946,13 +946,18 @@ func (app *App) distributeTasks(ctx context.Context) error {
 	// Create tasks to distribute
 	tasks := app.generateTasks()
 
+	if len(tasks) == 0 {
+		app.logger.Info("No tasks to distribute")
+		return nil
+	}
+
+	if len(workerPods) == 0 {
+		app.logger.Warning("No worker pods available")
+		return nil
+	}
+
 	// Distribute tasks among worker pods
 	for i, task := range tasks {
-		if len(workerPods) == 0 {
-			app.logger.Warning("No worker pods available")
-			break
-		}
-
 		workerPod := workerPods[i%len(workerPods)]
 		if err := app.assignTaskToPod(ctx, workerPod, task); err != nil {
 			app.logger.Errorf("Failed to assign task to pod %s: %v", workerPod, err)
@@ -964,30 +969,13 @@ func (app *App) distributeTasks(ctx context.Context) error {
 
 // generateTasks generates tasks to be distributed
 func (app *App) generateTasks() []map[string]interface{} {
-	// This is where you would generate your actual tasks
-	// For now, we'll create some sample tasks
-	tasks := []map[string]interface{}{
-		{
-			"id":      "task-1",
-			"command": "echo 'Hello from task 1'",
-			"type":    "cmd",
-		},
-		{
-			"id":      "task-2", 
-			"command": "echo 'Hello from task 2'",
-			"type":    "cmd",
-		},
-		{
-			"id":      "task-3",
-			"command": "echo 'Hello from task 3'",
-			"type":    "cmd",
-		},
-	}
+	var tasks []map[string]interface{}
 
-	// If config has input tasks, use those instead
+	// Only generate tasks if config has input tasks
 	if app.config.Request.Input != "" {
 		inputs, types, names := app.parseConfigInput(app.config.Request.Input)
 		tasks = make([]map[string]interface{}, len(inputs))
+		
 		for i, input := range inputs {
 			taskType := RequestTypeCmd
 			if i < len(types) {
@@ -1005,6 +993,10 @@ func (app *App) generateTasks() []map[string]interface{} {
 				"name":    taskName,
 			}
 		}
+		
+		app.logger.Infof("Generated %d tasks from configuration", len(tasks))
+	} else {
+		app.logger.Warning("No input configuration found, no tasks will be generated")
 	}
 
 	return tasks
@@ -1014,7 +1006,7 @@ func (app *App) generateTasks() []map[string]interface{} {
 func (app *App) assignTaskToPod(ctx context.Context, podName string, task map[string]interface{}) error {
 	// Create a ConfigMap to store the task
 	taskName := fmt.Sprintf("task-%s-%d", podName, time.Now().Unix())
-	
+
 	taskData, err := json.Marshal(task)
 	if err != nil {
 		return fmt.Errorf("failed to marshal task: %w", err)
@@ -1024,8 +1016,8 @@ func (app *App) assignTaskToPod(ctx context.Context, podName string, task map[st
 		Name:      taskName,
 		Namespace: app.namespace,
 		Labels: map[string]string{
-			"app":        "tz-mcall",
-			"task":       "true",
+			"app":         "tz-mcall",
+			"task":        "true",
 			"assigned-to": podName,
 		},
 		Annotations: map[string]string{
@@ -1037,7 +1029,7 @@ func (app *App) assignTaskToPod(ctx context.Context, podName string, task map[st
 	_, err = app.clientset.CoreV1().ConfigMaps(app.namespace).Create(ctx, &v1.ConfigMap{
 		ObjectMeta: *configMap,
 	}, metav1.CreateOptions{})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create task ConfigMap: %w", err)
 	}
@@ -1049,7 +1041,7 @@ func (app *App) assignTaskToPod(ctx context.Context, podName string, task map[st
 // runAsWorker runs the worker logic to process assigned tasks
 func (app *App) runAsWorker(ctx context.Context) error {
 	app.logger.Info("Running as worker - monitoring for assigned tasks")
-	
+
 	podName := os.Getenv("HOSTNAME")
 	if podName == "" {
 		podName = "mcall-pod"
@@ -1141,7 +1133,7 @@ func (app *App) executeTask(task map[string]interface{}) error {
 
 	// Execute the task using existing logic
 	results := app.execCmd(inputs, types, names)
-	
+
 	// Log the result
 	for _, result := range results {
 		app.logger.Infof("Task %s result: %s", taskID, result["result"])
