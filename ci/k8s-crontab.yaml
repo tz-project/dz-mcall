@@ -14,8 +14,8 @@ spec:
   failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
-      parallelism: 3  # Number of pods to run simultaneously (default: 3)
-      completions: 3  # Number of pods that must complete (default: 3)
+      parallelism: 2  # Number of pods to run simultaneously (default: 3)
+      completions: 2  # Number of pods that must complete (default: 3)
       template:
         metadata:
           labels:
