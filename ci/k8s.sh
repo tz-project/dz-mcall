@@ -82,7 +82,7 @@ elif [ "${STAGING}" = "prod" ]; then
     echo "✅ Production 환경: 기본 k8s.yaml 파일 사용"
 else
     if [ "${GIT_BRANCH}" = "access" ] || [ "${GIT_BRANCH}" = "block" ]; then
-      cp -Rf ci/k8s-crontab.yaml ci/k8s.yaml
+      cp -Rf ci/k8s-deployment.yaml ci/k8s.yaml
     else
       cp -Rf ci/k8s-dev.yaml ci/k8s.yaml
     fi
