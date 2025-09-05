@@ -954,16 +954,25 @@ func (app *App) distributeTasks(ctx context.Context) error {
 		return nil
 	}
 
+	app.logger.Infof("Generated %d tasks to distribute", len(tasks))
+	for i, task := range tasks {
+		app.logger.Infof("Task %d: %+v", i+1, task)
+	}
+
 	if len(workerPods) == 0 {
 		app.logger.Warning("No worker pods available")
 		return nil
 	}
 
 	// Distribute tasks among worker pods
+	app.logger.Infof("Starting task distribution to %d worker pods", len(workerPods))
 	for i, task := range tasks {
 		workerPod := workerPods[i%len(workerPods)]
+		app.logger.Infof("Assigning task %d (%s) to worker pod: %s", i+1, task["id"], workerPod)
 		if err := app.assignTaskToPod(ctx, workerPod, task); err != nil {
-			app.logger.Errorf("Failed to assign task to pod %s: %v", workerPod, err)
+			app.logger.Errorf("Failed to assign task %d to pod %s: %v", i+1, workerPod, err)
+		} else {
+			app.logger.Infof("Successfully assigned task %d to pod %s", i+1, workerPod)
 		}
 	}
 
@@ -1077,11 +1086,12 @@ func (app *App) processAssignedTasks(ctx context.Context, podName string) error 
 		return fmt.Errorf("failed to list assigned tasks: %w", err)
 	}
 
-	app.logger.Debugf("Found %d assigned tasks", len(configMaps.Items))
+	app.logger.Infof("Found %d assigned tasks for pod %s", len(configMaps.Items), podName)
 
 	for _, cm := range configMaps.Items {
 		// Check if task is already processed
 		if cm.Annotations["processed"] == "true" {
+			app.logger.Debugf("Task %s already processed, skipping", cm.Name)
 			continue
 		}
 
@@ -1099,7 +1109,7 @@ func (app *App) processAssignedTasks(ctx context.Context, podName string) error 
 		}
 
 		// Process the task
-		app.logger.Infof("Processing task %s", task["id"])
+		app.logger.Infof("Worker pod %s processing task %s: %s", podName, task["id"], task["command"])
 		if err := app.executeTask(task); err != nil {
 			app.logger.Errorf("Failed to execute task %s: %v", task["id"], err)
 		}
