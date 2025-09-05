@@ -22,7 +22,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o mcall .
 FROM alpine:3.18
 
 # Install required packages
-RUN apk --no-cache add ca-certificates curl telnet
+RUN apk --no-cache add ca-certificates curl busybox-extras
 
 WORKDIR /app
 
