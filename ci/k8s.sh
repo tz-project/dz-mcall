@@ -158,42 +158,6 @@ kubectl -n ${NAMESPACE} delete -f ci/k8s.yaml || echo "삭제할 리소스가 �
 # 새 리소스 배포
 echo "🚀 새 리소스 배포 중..."
 kubectl -n ${NAMESPACE} apply -f ci/k8s.yaml
-
-# 마이그레이션 실행
-echo "🔄 데이터베이스 마이그레이션 실행 중..."
-
-# 브랜치에 따른 deployment 이름 결정
-if [ "${GIT_BRANCH}" = "main" ]; then
-    DEPLOYMENT_NAME="drillquiz"
-else
-    DEPLOYMENT_NAME="drillquiz-${SECRET_SUFFIX}"
-fi
-
-echo "🔍 사용할 deployment 이름: ${DEPLOYMENT_NAME}"
-kubectl -n ${NAMESPACE} rollout status deployment/${DEPLOYMENT_NAME} --timeout=300s
-
-# Secret에서 데이터베이스 비밀번호 가져오기
-echo "🔐 Secret에서 데이터베이스 비밀번호 가져오는 중..."
-DB_PASSWORD=$(kubectl -n ${NAMESPACE} get secret drillquiz-secret-${SECRET_SUFFIX} -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d)
-if [ -z "${DB_PASSWORD}" ]; then
-    echo "❌ 데이터베이스 비밀번호를 가져올 수 없습니다."
-    exit 1
-fi
-echo "✅ 데이터베이스 비밀번호 가져오기 완료"
-
-# 브랜치에 따른 데이터베이스 호스트 설정 (마이그레이션용)
-if [ "${GIT_BRANCH}" = "main" ] || [ "${GIT_BRANCH}" = "qa" ]; then
-    DB_HOST="devops-postgres-postgresql.devops.svc.cluster.local"
-else
-    DB_HOST="devops-postgres-postgresql.devops-dev.svc.cluster.local"
-fi
-echo "🔍 마이그레이션용 데이터베이스 호스트: ${DB_HOST}"
-
-# 환경 변수와 함께 마이그레이션 실행
-echo "🔄 마이그레이션 실행 중..."
-kubectl -n ${NAMESPACE} exec deployment/${DEPLOYMENT_NAME} -- env POSTGRES_PASSWORD="${DB_PASSWORD}" POSTGRES_HOST="${DB_HOST}" python manage.py migrate
-
-echo "✅ 배포 및 마이그레이션 완료!"
 }
 
 # 메인 실행 로직
