@@ -64,11 +64,11 @@ spec:
           timeoutSeconds: 3
           failureThreshold: 3
         env:
-        - name: GIT_BRANCH
+        - name: GIT-BRANCH
           valueFrom:
             configMapKeyRef:
               name: dz-mcall-GIT_BRANCH
-              key: GIT_BRANCH
+              key: GIT-BRANCH
         - name: CONTAINER_ENV
           valueFrom:
             configMapKeyRef:

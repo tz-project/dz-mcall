@@ -64,16 +64,18 @@ spec:
           timeoutSeconds: 3
           failureThreshold: 3
         env:
-        - name: GIT_BRANCH
+        - name: GIT-BRANCH
           valueFrom:
             configMapKeyRef:
               name: dz-mcall
-              key: GIT_BRANCH
+              key: GIT-BRANCH
         - name: CONTAINER_ENV
           valueFrom:
             configMapKeyRef:
               name: dz-mcall
               key: container_env
+        command: ["/app/mcall"]
+        args: ["-w=true", "-p=3000", "-c=/app/etc/mcall.yaml"]
         volumeMounts:
         - name: config-volume
           mountPath: /app/etc
@@ -118,7 +120,7 @@ metadata:
     project: mcall
     environment: prod
 data:
-  GIT_BRANCH: ${GIT_BRANCH}
+  GIT-BRANCH: ${GIT_BRANCH}
   container_env: 'kubernetes'
 
 ---
