@@ -722,11 +722,14 @@ func setupLogging(config *Config) (*logging.Logger, error) {
 	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
 		// Fallback to /tmp directory
 		logFile = "/tmp/mcall.log"
+		fmt.Printf("Warning: Could not create log directory, using fallback: %s\n", logFile)
 	}
 
 	logFileHandle, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
+		// If log file creation fails, use stderr as fallback
+		fmt.Printf("Warning: Could not open log file %s, using stderr: %v\n", logFile, err)
+		logFileHandle = os.Stderr
 	}
 
 	logBackend := logging.NewLogBackend(logFileHandle, "", 0)
@@ -975,7 +978,7 @@ func (app *App) generateTasks() []map[string]interface{} {
 	if app.config.Request.Input != "" {
 		inputs, types, names := app.parseConfigInput(app.config.Request.Input)
 		tasks = make([]map[string]interface{}, len(inputs))
-		
+
 		for i, input := range inputs {
 			taskType := RequestTypeCmd
 			if i < len(types) {
@@ -993,7 +996,7 @@ func (app *App) generateTasks() []map[string]interface{} {
 				"name":    taskName,
 			}
 		}
-		
+
 		app.logger.Infof("Generated %d tasks from configuration", len(tasks))
 	} else {
 		app.logger.Warning("No input configuration found, no tasks will be generated")
