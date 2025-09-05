@@ -718,10 +718,10 @@ func setupLogging(config *Config) (*logging.Logger, error) {
 		logFile = DefaultLogFile
 	}
 
-	// Try to create log directory, but fallback to current directory if permission denied
+	// Try to create log directory, but fallback to /tmp if permission denied
 	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
-		// Fallback to current directory
-		logFile = "./mcall.log"
+		// Fallback to /tmp directory
+		logFile = "/tmp/mcall.log"
 	}
 
 	logFileHandle, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)

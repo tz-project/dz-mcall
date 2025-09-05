@@ -80,6 +80,13 @@ spec:
           readOnly: true
         - name: logs-volume
           mountPath: /var/log/mcall
+      initContainers:
+      - name: init-logs
+        image: busybox
+        command: ['sh', '-c', 'mkdir -p /var/log/mcall && chmod 755 /var/log/mcall']
+        volumeMounts:
+        - name: logs-volume
+          mountPath: /var/log/mcall
       volumes:
       - name: config-volume
         configMap:
