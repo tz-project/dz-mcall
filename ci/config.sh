@@ -21,6 +21,8 @@ echo "Configuring dz-mcall for branch: $GIT_BRANCH, staging: $STAGING"
 # rm -f etc/mcall.yaml
 
 # Set GIT_BRANCH environment variable (sanitized)
+# Remove origin/ prefix if present
+export GIT_BRANCH=$(echo "${GIT_BRANCH}" | sed 's|^origin/||')
 export GIT_BRANCH=$(echo "${GIT_BRANCH}" | sed 's/\//-/g')
 export GIT_BRANCH=$(echo "${GIT_BRANCH}" | cut -b1-21)
 
