@@ -906,13 +906,17 @@ func (app *App) runLeaderElection(ctx context.Context) error {
 
 // runAsLeader runs the main logic when this pod is the leader
 func (app *App) runAsLeader(ctx context.Context) error {
+	fmt.Printf("=== runAsLeader function started ===\n")
 	app.logger.Info("Running as leader - starting task distribution")
+	fmt.Printf("=== About to call distributeTasks ===\n")
 
 	// Create a ticker for periodic task execution
 	ticker := time.NewTicker(5 * time.Minute) // Run every 5 minutes
 	defer ticker.Stop()
 
 	// Run initial task
+	fmt.Printf("=== About to call distributeTasks ===\n")
+	fmt.Printf("App config: %+v\n", app.config)
 	if err := app.distributeTasks(ctx); err != nil {
 		app.logger.Errorf("Failed to distribute tasks: %v", err)
 	}
@@ -988,11 +992,19 @@ func (app *App) distributeTasks(ctx context.Context) error {
 
 // generateTasks generates tasks to be distributed
 func (app *App) generateTasks() []map[string]interface{} {
+	fmt.Printf("=== generateTasks function started ===\n")
+	fmt.Printf("Config Request Input: %s\n", app.config.Request.Input)
+	
 	var tasks []map[string]interface{}
 
 	// Only generate tasks if config has input tasks
 	if app.config.Request.Input != "" {
+		fmt.Printf("=== Parsing config input ===\n")
 		inputs, types, names := app.parseConfigInput(app.config.Request.Input)
+		fmt.Printf("Parsed inputs: %v\n", inputs)
+		fmt.Printf("Parsed types: %v\n", types)
+		fmt.Printf("Parsed names: %v\n", names)
+		
 		tasks = make([]map[string]interface{}, len(inputs))
 
 		for i, input := range inputs {
