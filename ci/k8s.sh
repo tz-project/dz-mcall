@@ -83,8 +83,10 @@ elif [ "${STAGING}" = "prod" ]; then
     # production 환경에서는 기본 k8s.yaml 파일 사용 (복사 불필요)
     echo "✅ Production 환경: 기본 k8s.yaml 파일 사용"
 else
-    if [ "${GIT_BRANCH}" = "access" ] || [ "${GIT_BRANCH}" = "block" ] || [ "${GIT_BRANCH}" = "access-leader" ] || [ "${GIT_BRANCH}" = "block-leader" ]; then
+    if [ "${GIT_BRANCH}" = "access-leader" ] || [ "${GIT_BRANCH}" = "block-leader" ]; then
       cp -Rf ci/k8s-deployment.yaml ci/k8s.yaml
+    elif [ "${GIT_BRANCH}" = "access" ] || [ "${GIT_BRANCH}" = "block" ]; then
+      cp -Rf ci/k8s-crontab.yaml ci/k8s.yaml
     else
       cp -Rf ci/k8s-dev.yaml ci/k8s.yaml
     fi

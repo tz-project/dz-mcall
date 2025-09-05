@@ -757,7 +757,7 @@ func getLockName() string {
 	if gitBranch == "" {
 		return "dz-mcall-leader"
 	}
-	
+
 	// Convert _ to - for Kubernetes resource naming
 	gitBranch = strings.ReplaceAll(gitBranch, "_", "-")
 	return fmt.Sprintf("dz-mcall-leader-%s", gitBranch)
@@ -1006,7 +1006,7 @@ func (app *App) distributeTasks(ctx context.Context) error {
 func (app *App) generateTasks() []map[string]interface{} {
 	fmt.Printf("=== generateTasks function started ===\n")
 	fmt.Printf("Config Request Input: %s\n", app.config.Request.Input)
-	
+
 	var tasks []map[string]interface{}
 
 	// Only generate tasks if config has input tasks
@@ -1016,7 +1016,7 @@ func (app *App) generateTasks() []map[string]interface{} {
 		fmt.Printf("Parsed inputs: %v\n", inputs)
 		fmt.Printf("Parsed types: %v\n", types)
 		fmt.Printf("Parsed names: %v\n", names)
-		
+
 		tasks = make([]map[string]interface{}, len(inputs))
 
 		for i, input := range inputs {
