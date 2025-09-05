@@ -24,98 +24,6 @@ echo "GIT_BRANCH: ${GIT_BRANCH}"
 echo "NAMESPACE: ${NAMESPACE}"
 echo "ACTION: ${ACTION}"
 
-# 프론트엔드 빌드 함수
-build_frontend() {
-    echo "🚀 프론트엔드 빌드 시작..."
-    
-    # 도메인 생성 (기존 로직 재사용)
-    clean_branch=$(echo "${GIT_BRANCH}" | sed 's|^origin/||')
-    echo "🔍 정리된 브랜치: ${clean_branch}"
-    
-    DOMAIN_SUFFIX=""
-    if [ "${clean_branch}" = "main" ]; then
-        DOMAIN_SUFFIX=""
-    elif [ "${clean_branch}" = "qa" ]; then
-        DOMAIN_SUFFIX="-qa"
-    else
-        DOMAIN_SUFFIX="-${clean_branch}"
-    fi
-    
-    domain="us${DOMAIN_SUFFIX}.drillquiz.com"
-    echo "✅ 생성된 도메인: ${domain}"
-    
-    # 환경 변수 파일 치환
-    echo "🔧 환경 변수 파일 치환 중..."
-    
-    # 브랜치에 따른 데이터베이스 호스트 설정
-    if [ "${clean_branch}" = "main" ] || [ "${clean_branch}" = "qa" ]; then
-        DB_HOST="devops-postgres-postgresql.devops.svc.cluster.local"
-    else
-        DB_HOST="devops-postgres-postgresql.devops-dev.svc.cluster.local"
-    fi
-    echo "🔍 사용할 데이터베이스 호스트: ${DB_HOST}"
-    
-    # 도메인 치환
-    sed -i "s/DOMAIN_PLACEHOLDER/${domain}/g" env-frontend
-    sed -i "s/DOMAIN_PLACEHOLDER/${domain}/g" env
-    sed -i "s/DOMAIN_PLACEHOLDER/${domain}/g" package.json
-    
-    # 데이터베이스 호스트 치환
-    sed -i "s|POSTGRES_HOST=.*|POSTGRES_HOST=${DB_HOST}|g" env
-    
-    echo "✅ 환경 변수 파일 치환 완료 "
-    
-    # 프론트엔드 Docker 이미지 빌드
-    echo "🔨 프론트엔드 Docker 이미지 빌드 중..."
-    image_frontend="doohee323/drillquiz-frontend:${BUILD_NUMBER}"
-    cp -Rf Dockerfile.frontend Dockerfile
-    docker build -t ${image_frontend} .
-    
-    # 컨테이너에서 빌드 파일 추출
-    echo "📦 컨테이너에서 빌드 파일 추출 중..."
-    docker create --name frontend-extract ${image_frontend}
-    docker cp frontend-extract:/usr/share/nginx/html ./frontend-dist
-    docker rm frontend-extract
-    
-    # public 디렉토리로 파일 복사 (SEO 파일 보존)
-    echo "📁 public 디렉토리로 파일 복사 중..."
-    
-    # SEO 파일들 백업
-    echo "🔒 SEO 파일들 백업 중..."
-    mkdir -p seo-backup
-    cp -f public/sitemap.xml seo-backup/ 2>/dev/null || echo "sitemap.xml 백업 (없음)"
-    cp -f public/robots.txt seo-backup/ 2>/dev/null || echo "robots.txt 백업 (없음)"
-    
-    # 기존 파일 삭제 후 새 파일 복사
-    rm -rf public/*
-    cp -Rf frontend-dist/* public/
-    
-    # SEO 파일들 복원
-    echo "🔒 SEO 파일들 복원 중..."
-    cp -f seo-backup/sitemap.xml public/ 2>/dev/null || echo "sitemap.xml 복원 (없음)"
-    
-    # 브랜치별 robots.txt 설정
-    echo "🔍 브랜치별 robots.txt 설정 중..."
-    if [ "${clean_branch}" = "main" ]; then
-        echo "✅ main 브랜치: 모든 크롤링 허용"
-        cp -f seo-backup/robots.txt public/ 2>/dev/null || echo "robots.txt 복원 (없음)"
-    else
-        echo "🚫 개발/테스트 브랜치: 모든 크롤링 차단"
-        echo "User-agent: *" > public/robots.txt
-        echo "Disallow: /" >> public/robots.txt
-        echo "" >> public/robots.txt
-        echo "# 모든 검색 엔진 크롤링 차단" >> public/robots.txt
-        echo "# 이 환경은 프로덕션이 아닌 개발/테스트 환경입니다" >> public/robots.txt
-        echo "# 브랜치: ${clean_branch}" >> public/robots.txt
-    fi
-    
-    # 백업 디렉토리 정리
-    rm -rf seo-backup
-    rm -rf frontend-dist
-    
-    echo "✅ 프론트엔드 빌드 완료!"
-}
-
 # 배포 함수
 deploy_to_kubernetes() {
     echo "🔍 배포 정보:"
@@ -162,7 +70,7 @@ else
 fi
 
 # 도메인 생성 (통합 배포)
-DOMAIN="us${DOMAIN_SUFFIX}.drillquiz.com"
+DOMAIN="mcall${DOMAIN_SUFFIX}.drillquiz.com"
 
 echo "✅ STAGING: ${STAGING}"
 echo "✅ 생성된 도메인: ${DOMAIN}"
@@ -198,7 +106,6 @@ fi
 echo "🔍 사용할 데이터베이스 호스트: ${DB_HOST}"
 
 # 도메인 치환
-sed -i "s/DOMAIN_PLACEHOLDER/${DOMAIN}/g" env-frontend
 sed -i "s/DOMAIN_PLACEHOLDER/${DOMAIN}/g" env
 sed -i "s/DOMAIN_PLACEHOLDER/${DOMAIN}/g" package.json
 
@@ -291,15 +198,12 @@ echo "✅ 배포 및 마이그레이션 완료!"
 
 # 메인 실행 로직
 case "${ACTION}" in
-    "build-frontend")
-        build_frontend
-        ;;
     "deploy")
         deploy_to_kubernetes
         ;;
     *)
         echo "❌ 잘못된 ACTION: ${ACTION}"
-        echo "사용법: $0 <BUILD_NUMBER> <GIT_BRANCH> <NAMESPACE> [build-frontend|deploy]"
+        echo "사용법: $0 <BUILD_NUMBER> <GIT_BRANCH> <NAMESPACE> [deploy]"
         exit 1
         ;;
 esac
