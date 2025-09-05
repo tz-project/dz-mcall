@@ -26,7 +26,7 @@ spec:
             app: dz-mcall-GIT_BRANCH
         spec:
           restartPolicy: OnFailure
-#          serviceAccountName: dz-mcall-GIT_BRANCH
+          serviceAccountName: dz-mcall-GIT_BRANCH
           imagePullSecrets:
             - name: tz-registrykey
           securityContext:
@@ -71,3 +71,47 @@ spec:
               name: dz-mcall-config-GIT_BRANCH
           - name: logs-volume
             emptyDir: {}
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dz-mcall-GIT_BRANCH
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: STAGING
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dz-mcall-config-GIT_BRANCH
+  labels:
+    org: tz
+    team: devops
+    project: mcall
+    environment: STAGING
+data:
+  mcall.yaml: |
+    request:
+      type: cmd
+      input: |
+        {
+          "inputs": [
+            {"input": "pwd"},
+            {"input": "ls -la"}
+          ]
+        }
+    response:
+      format: json
+    worker:
+      number: 3
+    log:
+      level: debug
+      file: /app/log/mcall/mcall.log
+    webserver:
+      enable: false
+      host: 0.0.0.0
+      port: 3000
