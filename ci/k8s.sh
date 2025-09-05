@@ -97,9 +97,6 @@ echo "Secret 이름에 사용할 SUFFIX: ${SECRET_SUFFIX}"
 echo "🔧 환경 변수 파일 치환 중..."
 echo "🔍 치환할 도메인: ${DOMAIN}"
 
-# 도메인 치환
-sed -i "s/DOMAIN_PLACEHOLDER/${DOMAIN}/g" package.json
-
 echo "✅ 환경 변수 파일 치환 완료"
 
 # k8s.yaml 파일 치환
