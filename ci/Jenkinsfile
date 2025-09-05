@@ -1,0 +1,110 @@
+pipeline {
+    agent {
+        kubernetes {
+            label 'docker'
+            defaultContainer 'docker'
+        }
+    }
+
+    environment {
+        GIT_BRANCH = "${env.BRANCH_NAME ?: env.GIT_BRANCH ?: env.CHANGE_BRANCH ?: 'main'}"
+        GIT_COMMITTER_EMAIL = "doohee323@gmail.com"
+
+        BUILD_NUMBER = "${env.BUILD_NUMBER ?: 'latest'}"
+        DOCKER_NAME = "dz-mcall"
+        APP_NAME = "dz-mcall"
+        DEPLOYMENT_NAME = 'dz-mcall'
+        NAMESPACE = "${(env.BRANCH_NAME ?: env.GIT_BRANCH ?: env.CHANGE_BRANCH ?: 'main').replaceAll('^origin/', '') == 'main' || (env.BRANCH_NAME ?: env.GIT_BRANCH ?: env.CHANGE_BRANCH ?: 'main').replaceAll('^origin/', '') == 'qa' ? 'devops' : 'devops-dev'}"
+        NODE_ENV = "development"
+        K8S_FILE = "k8s.yaml"
+
+        KUBECTL = "kubectl -n ${NAMESPACE}"
+        KUBECONFIG_CREDENTIALS_ID = 'kubeconfig-jenkins'
+
+        GIT_CREDENTIAL = 'github-token'
+        GITHUP_TOKEN = credentials('GITHUP_TOKEN')
+
+        REGISTRY = 'doohee323'
+        DOCKERHUB_CREDENTIALS_ID = 'DOCKERHUB_CREDENTIALS_ID'
+
+        VAULT_TOKEN = credentials('VAULT_TOKEN')
+        ARGOCD_ID = "admin"
+        ARGOCD_PASSWORD = credentials('ARGOCD_PASSWORD')
+        DOCKER_PASSWORD = credentials('DOCKER_PASSWORD')
+
+        GOOGLE_OAUTH_CLIENT_SECRET = credentials('GOOGLE_OAUTH_CLIENT_SECRET')
+        MINIO_SECRET_KEY = credentials('MINIO_SECRET_KEY')
+        POSTGRES_PASSWORD = credentials('POSTGRES_PASSWORD')
+        OPENAI_API_KEY = credentials('OPENAI_API_KEY')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                container('docker') {
+                    script {
+                        checkout scm
+                    }
+                }
+            }
+        }
+
+          stage('Configuration') {
+             steps {
+                dir("${workspace}"){
+                    script{
+                        echo "Running configuration script for branch: ${GIT_BRANCH}, staging: ${STAGING}"
+                        sh "bash ./ci/config.sh ${GIT_BRANCH} ${STAGING}"
+                    }
+                }
+             }
+          }
+
+        stage('Build & Push Image') {
+            steps {
+                container('docker') {
+                    script {
+                        try {
+                            withDockerRegistry(credentialsId: "${DOCKERHUB_CREDENTIALS_ID}", url: '') {
+                                def image = "${REGISTRY}/${DOCKER_NAME}:${BUILD_NUMBER}"
+                                sh "cp -Rf docker/Dockerfile Dockerfile"
+                                sh "docker build -t ${image} ."
+
+                                echo "Pushing image: ${image}"
+                                sh "docker push ${image}"
+                            }
+                        } catch (err) {
+                            echo "Docker push failed: ${err}"
+                            error("Stopping pipeline due to push failure.")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('kubectl') {
+                    script {
+                        try {
+                            withCredentials([file(credentialsId: "${KUBECONFIG_CREDENTIALS_ID}", variable: 'KUBECONFIG')]) {
+                                sh '''
+                                    export PATH=$PATH:.:
+                                    chmod +x ci/k8s.sh
+                                    echo "🚀 Kubernetes 배포 시작..."
+                                    echo "  BUILD_NUMBER: ${BUILD_NUMBER}"
+                                    echo "  GIT_BRANCH: ${GIT_BRANCH}"
+                                    echo "  NAMESPACE: ${NAMESPACE}"
+                                    ./ci/k8s.sh ${BUILD_NUMBER} ${GIT_BRANCH} ${NAMESPACE} deploy
+                                '''
+                            }
+                        } catch (err) {
+                            echo "kubectl failed: ${err}"
+                            error("Stopping pipeline due to kubectl failure.")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
