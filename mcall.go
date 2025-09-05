@@ -941,7 +941,7 @@ func (app *App) distributeTasks(ctx context.Context) error {
 
 	// Get list of available pods
 	pods, err := app.clientset.CoreV1().Pods(app.namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: "app=dz-mcall",
+		LabelSelector: "project=mcall",
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list pods: %w", err)
@@ -1047,7 +1047,7 @@ func (app *App) assignTaskToPod(ctx context.Context, podName string, task map[st
 		Name:      taskName,
 		Namespace: app.namespace,
 		Labels: map[string]string{
-			"app":         "dz-mcall",
+			"project":     "mcall",
 			"task":        "true",
 			"assigned-to": podName,
 		},
@@ -1099,7 +1099,7 @@ func (app *App) runAsWorker(ctx context.Context) error {
 func (app *App) processAssignedTasks(ctx context.Context, podName string) error {
 	// List ConfigMaps assigned to this pod
 	configMaps, err := app.clientset.CoreV1().ConfigMaps(app.namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("app=dz-mcall,task=true,assigned-to=%s", podName),
+		LabelSelector: fmt.Sprintf("project=mcall,task=true,assigned-to=%s", podName),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list assigned tasks: %w", err)
