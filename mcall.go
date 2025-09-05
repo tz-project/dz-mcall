@@ -854,9 +854,11 @@ func (app *App) runLeaderElection(ctx context.Context) error {
 		Lock: lock,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
+				fmt.Printf("=== OnStartedLeading callback called ===\n")
 				app.logger.Infof("Pod %s became the leader", podName)
 				app.logger.Infof("Starting runAsLeader function in goroutine")
 				go func() {
+					fmt.Printf("=== runAsLeader goroutine started ===\n")
 					if err := app.runAsLeader(ctx); err != nil {
 						app.logger.Errorf("runAsLeader failed: %v", err)
 					}
