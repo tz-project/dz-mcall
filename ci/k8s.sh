@@ -97,20 +97,8 @@ echo "Secret 이름에 사용할 SUFFIX: ${SECRET_SUFFIX}"
 echo "🔧 환경 변수 파일 치환 중..."
 echo "🔍 치환할 도메인: ${DOMAIN}"
 
-# 브랜치에 따른 데이터베이스 호스트 설정
-if [ "${GIT_BRANCH}" = "main" ] || [ "${GIT_BRANCH}" = "qa" ]; then
-    DB_HOST="devops-postgres-postgresql.devops.svc.cluster.local"
-else
-    DB_HOST="devops-postgres-postgresql.devops-dev.svc.cluster.local"
-fi
-echo "🔍 사용할 데이터베이스 호스트: ${DB_HOST}"
-
 # 도메인 치환
-sed -i "s/DOMAIN_PLACEHOLDER/${DOMAIN}/g" env
 sed -i "s/DOMAIN_PLACEHOLDER/${DOMAIN}/g" package.json
-
-# 데이터베이스 호스트 치환
-sed -i "s|POSTGRES_HOST=.*|POSTGRES_HOST=${DB_HOST}|g" env
 
 echo "✅ 환경 변수 파일 치환 완료"
 
@@ -140,16 +128,6 @@ sed -ie "s|#POSTGRES_PASSWORD|${POSTGRES_PASSWORD}|g" ci/k8s.yaml
 awk -v key="$OPENAI_API_KEY" '{gsub(/#OPENAI_API_KEY/, key)}1' ci/k8s.yaml > ci/k8s.yaml.tmp && mv ci/k8s.yaml.tmp ci/k8s.yaml
 
 cat ci/k8s.yaml
-
-# Secret 생성 (치환된 env 파일 사용) - 수작업으로 등록된 Secret 사용
-# echo "🔐 Secret 생성 중..."
-# kubectl -n ${NAMESPACE} create secret generic drillquiz-secret-${SECRET_SUFFIX} --from-env-file=env --dry-run=client -o yaml | kubectl -n ${NAMESPACE} apply -f -
-
-# ConfigMap도 함께 업데이트 (데이터베이스 호스트 설정을 위해)
-echo "🔧 ConfigMap 업데이트 중..."
-kubectl -n ${NAMESPACE} create configmap drillquiz-configmap-${SECRET_SUFFIX} --from-env-file=env --dry-run=client -o yaml | kubectl -n ${NAMESPACE} apply -f -
-
-
 
 # 기존 리소스 삭제 (실패해도 계속 진행)
 echo "🗑️  기존 리소스 삭제 중..."
