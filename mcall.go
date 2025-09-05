@@ -694,7 +694,7 @@ func NewApp(config *Config) *App {
 			IndexName: config.Response.ES.IndexName,
 		},
 		namespace: "default",
-		lockName:  "dz-mcall-leader",
+		lockName:  getLockName(),
 	}
 
 	// Set defaults
@@ -749,6 +749,18 @@ func setupLogging(config *Config) (*logging.Logger, error) {
 	logging.SetLevel(level, "")
 
 	return logging.MustGetLogger("mcall"), nil
+}
+
+// getLockName returns the lock name based on GIT_BRANCH environment variable
+func getLockName() string {
+	gitBranch := os.Getenv("GIT_BRANCH")
+	if gitBranch == "" {
+		return "dz-mcall-leader"
+	}
+	
+	// Convert _ to - for Kubernetes resource naming
+	gitBranch = strings.ReplaceAll(gitBranch, "_", "-")
+	return fmt.Sprintf("dz-mcall-leader-%s", gitBranch)
 }
 
 // loadConfig loads configuration from file or sets defaults
