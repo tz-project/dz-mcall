@@ -40,11 +40,11 @@ else
 fi
 
 # Copy appropriate configuration based on branch
-if [ "${GIT_BRANCH}" = "block" ] || [ "${GIT_BRANCH}" = "block_leader" ]; then
+if [ "${GIT_BRANCH}" = "block" ] || [ "${GIT_BRANCH}" = "block-leader" ]; then
     echo "Using block_access.yaml configuration"
     rm -f etc/mcall.yaml
     cp -f etc/block_access.yaml etc/mcall.yaml
-elif [ "${GIT_BRANCH}" = "access" ] || [ "${GIT_BRANCH}" = "access_leader" ]; then    
+elif [ "${GIT_BRANCH}" = "access" ] || [ "${GIT_BRANCH}" = "access-leader" ]; then    
     echo "Using allow_access.yaml configuration"
     rm -f etc/mcall.yaml
     cp -f etc/allow_access.yaml etc/mcall.yaml

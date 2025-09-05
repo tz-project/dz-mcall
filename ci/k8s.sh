@@ -55,6 +55,8 @@ fi
 
 # origin/ 접두사 제거
 GIT_BRANCH=$(echo "${GIT_BRANCH}" | sed 's|^origin/||')
+# Kubernetes 리소스 이름 규칙에 맞게 _ 를 - 로 변경
+GIT_BRANCH=$(echo "${GIT_BRANCH}" | sed 's|_|-|g')
 echo "🔍 정리된 GIT_BRANCH: ${GIT_BRANCH}"
 
 # 브랜치에 따른 STAGING과 도메인 설정
