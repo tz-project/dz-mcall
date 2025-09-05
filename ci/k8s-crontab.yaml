@@ -26,7 +26,7 @@ spec:
             app: dz-mcall-GIT_BRANCH
         spec:
           restartPolicy: OnFailure
-          serviceAccountName: dz-mcall-GIT_BRANCH
+#          serviceAccountName: dz-mcall-GIT_BRANCH
           imagePullSecrets:
             - name: tz-registrykey
           securityContext:
