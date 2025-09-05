@@ -55,7 +55,7 @@ pipeline {
                 dir("${workspace}"){
                     script{
                         echo "Running configuration script for branch: ${GIT_BRANCH}, staging: ${STAGING}"
-                        sh "bash ./ci/config.sh ${GIT_BRANCH} ${STAGING}"
+                        sh "/bin/bash ./ci/config.sh ${GIT_BRANCH} ${STAGING}"
                     }
                 }
              }
