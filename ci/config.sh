@@ -17,8 +17,8 @@ STAGING=$2
 
 echo "Configuring dz-mcall for branch: $GIT_BRANCH, staging: $STAGING"
 
-# Clean up existing configuration
-rm -f etc/mcall.yaml
+# Clean up existing configuration (only if we're going to replace it)
+# rm -f etc/mcall.yaml
 
 # Set GIT_BRANCH environment variable (sanitized)
 export GIT_BRANCH=$(echo "${GIT_BRANCH}" | sed 's/\//-/g')
@@ -40,15 +40,20 @@ fi
 # Copy appropriate configuration based on branch
 if [[ "${GIT_BRANCH}" == "block" ]]; then
     echo "Using block_access.yaml configuration"
+    rm -f etc/mcall.yaml
     cp -f etc/block_access.yaml etc/mcall.yaml
 elif [[ "${GIT_BRANCH}" == "access" ]]; then
     echo "Using allow_access.yaml configuration"
+    rm -f etc/mcall.yaml
     cp -f etc/allow_access.yaml etc/mcall.yaml
 else
     echo "Using default mcall.yaml configuration"
-    # Keep the default mcall.yaml if it exists
+    # Keep the original mcall.yaml as default configuration
     if [ ! -f etc/mcall.yaml ]; then
-        echo "Warning: No configuration file selected, using default"
+        echo "Error: Default mcall.yaml not found!"
+        exit 1
+    else
+        echo "Using existing mcall.yaml as default"
     fi
 fi
 
