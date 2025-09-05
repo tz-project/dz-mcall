@@ -130,6 +130,10 @@ awk -v key="$OPENAI_API_KEY" '{gsub(/#OPENAI_API_KEY/, key)}1' ci/k8s.yaml > ci/
 
 cat ci/k8s.yaml
 
+# RBAC 리소스 배포 (먼저 배포)
+echo "🔐 RBAC 리소스 배포 중..."
+kubectl apply -f ci/k8s-rbac.yaml
+
 # 기존 리소스 삭제 (실패해도 계속 진행)
 echo "🗑️  기존 리소스 삭제 중..."
 kubectl -n ${NAMESPACE} delete -f ci/k8s.yaml || echo "삭제할 리소스가 없습니다 (정상)"
