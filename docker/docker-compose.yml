@@ -13,7 +13,7 @@ services:
       # Mount configuration file (optional)
       - ../etc/mcall.yaml:/app/mcall.yaml:ro
       # Mount log directory for persistence
-      - mcall-logs:/var/log/mcall
+      - mcall-logs:/app/log/mcall
     environment:
       - TZ=UTC
     restart: unless-stopped

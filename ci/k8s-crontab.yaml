@@ -64,7 +64,7 @@ spec:
                 mountPath: /app/etc
                 readOnly: true
               - name: logs-volume
-                mountPath: /var/log/mcall
+                mountPath: /app/log/mcall
           volumes:
           - name: config-volume
             configMap:

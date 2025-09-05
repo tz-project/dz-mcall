@@ -39,7 +39,7 @@ const (
 	DefaultHTTPPort        = "3000"
 	DefaultFormat          = "json"
 	DefaultLogLevel        = "DEBUG"
-	DefaultLogFile         = "/var/log/mcall/mcall.log"
+	DefaultLogFile         = "/app/log/mcall/mcall.log"
 	DefaultChannelSize     = 100
 	DefaultTimeoutDuration = DefaultTimeout * time.Second
 

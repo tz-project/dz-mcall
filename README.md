@@ -115,7 +115,7 @@ worker:
 
 log:
   level: info
-  file: /var/log/mcall/mcall.log
+  file: /app/log/mcall/mcall.log
 
 webserver:
   enable: true
@@ -380,7 +380,7 @@ kubectl get pods -n devops -l app=dz-mcall
 
 ```bash
 # View application logs
-tail -f /var/log/mcall/mcall.log
+tail -f /app/log/mcall/mcall.log
 
 # View container logs
 docker logs dz-mcall-container
@@ -403,8 +403,8 @@ kubectl logs -f deployment/dz-mcall -n devops
 #### Permission Denied
 ```bash
 # Fix log directory permissions
-sudo mkdir -p /var/log/mcall
-sudo chmod 755 /var/log/mcall
+sudo mkdir -p /app/log/mcall
+sudo chmod 755 /app/log/mcall
 ```
 
 #### Port Already in Use

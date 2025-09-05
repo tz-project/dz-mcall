@@ -31,8 +31,8 @@ COPY --from=build /app/mcall /app/mcall
 COPY --from=build /app/mcall.yaml /app/mcall.yaml
 
 # Create log directory and set permissions
-RUN mkdir -p /var/log/mcall && \
-    chmod 755 /var/log/mcall && \
+RUN mkdir -p /app/log/mcall && \
+    chmod 755 /app/log/mcall && \
     chmod +x /app/mcall
 
 # Set environment variables

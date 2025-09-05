@@ -12,11 +12,11 @@ sudo echo 'cd /usr/dz-mcall' >> /etc/service/dz-mcall/run
 sudo echo './mcall -w=true &' >> /etc/service/dz-mcall/run
 
 # Create log directory
-sudo mkdir -p /var/log/mcall
-sudo chmod 755 /var/log/mcall
+sudo mkdir -p /app/log/mcall
+sudo chmod 755 /app/log/mcall
 
 # Set proper ownership (adjust user:group as needed)
-# sudo chown -Rf root:root /var/log/mcall
+# sudo chown -Rf root:root /app/log/mcall
 # sudo chown -Rf root:root /etc/service/dz-mcall
 
 # Start the service

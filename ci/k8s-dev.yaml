@@ -79,14 +79,7 @@ spec:
           mountPath: /app/etc
           readOnly: true
         - name: logs-volume
-          mountPath: /var/log/mcall
-      initContainers:
-      - name: init-logs
-        image: busybox
-        command: ['sh', '-c', 'mkdir -p /var/log/mcall && chmod 755 /var/log/mcall']
-        volumeMounts:
-        - name: logs-volume
-          mountPath: /var/log/mcall
+          mountPath: /app/log/mcall
       volumes:
       - name: config-volume
         configMap:
@@ -155,7 +148,7 @@ data:
       number: 3
     log:
       level: debug
-      file: /var/log/mcall/mcall.log
+      file: /app/log/mcall/mcall.log
     webserver:
       enable: true
       host: 0.0.0.0
