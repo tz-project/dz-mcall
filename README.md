@@ -233,6 +233,75 @@ Execute HTTP GET/POST requests.
 ]
 ```
 
+## 🌿 Branch-based Deployment Strategy
+
+This project supports different deployment modes based on Git branches, allowing for flexible and environment-specific configurations.
+
+### Branch Configuration
+
+| Branch Type | Deployment Mode | Description | Configuration File |
+|-------------|----------------|-------------|-------------------|
+| `main` / `dev` | **Web Server** | Runs as a web server for interactive use | `k8s-dev.yaml` |
+| `access_leader` / `block_leader` | **Leader-Worker** | Runs with leader election for distributed task processing | `k8s-deployment.yaml` |
+| `access` / `block` | **CronJob** | Runs as Kubernetes CronJob for scheduled tasks | `k8s-crontab.yaml` |
+
+### Deployment Modes
+
+#### 1. Web Server Mode (`main` / `dev`)
+- **Purpose**: Interactive web interface for manual task execution
+- **Deployment**: Kubernetes Deployment with 1 replica
+- **Features**:
+  - HTTP API endpoints for command execution
+  - Health check endpoints
+  - Real-time monitoring interface
+- **Use Case**: Development, testing, and manual operations
+
+#### 2. Leader-Worker Mode (`access_leader` / `block_leader`)
+- **Purpose**: Distributed task processing with leader election
+- **Deployment**: Kubernetes Deployment with 3 replicas
+- **Features**:
+  - Leader election using Kubernetes leases
+  - Automatic task distribution among workers
+  - 5-minute periodic task execution
+  - Independent lease per branch (`dz-mcall-leader-{branch}`)
+- **Use Case**: Production task processing, automated workflows
+
+#### 3. CronJob Mode (`access` / `block`)
+- **Purpose**: Scheduled task execution
+- **Deployment**: Kubernetes CronJob
+- **Features**:
+  - Scheduled execution (every 5 minutes by default)
+  - Branch-specific configuration files
+  - `access` branch uses `allow_access.yaml`
+  - `block` branch uses `block_access.yaml`
+- **Use Case**: Scheduled maintenance, periodic checks
+
+### Configuration Files
+
+#### Branch-specific Configurations
+- **`access_leader`**: Uses `allow_access.yaml` for access control tasks
+- **`block_leader`**: Uses `block_access.yaml` for blocking tasks
+- **`access`**: Uses `allow_access.yaml` via CronJob
+- **`block`**: Uses `block_access.yaml` via CronJob
+
+#### Environment Variables
+- **`GIT_BRANCH`**: Automatically set to branch name
+- **`LEADER_ELECTION`**: `true` for leader-worker mode, `false` for others
+- **`NAMESPACE`**: Kubernetes namespace for deployment
+
+### Deployment Commands
+
+```bash
+# Deploy web server mode (main/dev)
+kubectl apply -f ci/k8s-dev.yaml -n devops-dev
+
+# Deploy leader-worker mode (access_leader/block_leader)
+kubectl apply -f ci/k8s-deployment.yaml -n devops-dev
+
+# Deploy cronjob mode (access/block)
+kubectl apply -f ci/k8s-crontab.yaml -n devops-dev
+```
+
 ## 🚀 Deployment
 
 ### Docker
