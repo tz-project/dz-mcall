@@ -188,5 +188,5 @@ spec:
               number: 3000
   tls:
     - hosts:
-        - GIT_BRANCH.mcall.${DOMAIN_NAME}
+        - DOMAIN_PLACEHOLDER
       secretName: dz-mcall-GIT_BRANCH
