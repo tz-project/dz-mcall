@@ -40,8 +40,8 @@ spec:
               memory: "256Mi"
               cpu: "200m"
           env:
-          - name: GIT_BRANCH
-            value: GIT-BRANCH
+          - name: GIT-BRANCH
+            value: GIT_BRANCH
           - name: CONTAINER_ENV
             value: 'kubernetes'
           - name: LEADER_ELECTION

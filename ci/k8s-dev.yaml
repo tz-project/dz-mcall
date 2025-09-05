@@ -120,7 +120,7 @@ metadata:
     project: mcall
     environment: STAGING
 data:
-  GIT_BRANCH: GIT_BRANCH
+  GIT-BRANCH: GIT_BRANCH
   container_env: 'kubernetes'
 
 ---
