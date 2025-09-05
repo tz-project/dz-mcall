@@ -81,7 +81,11 @@ elif [ "${STAGING}" = "prod" ]; then
     # production 환경에서는 기본 k8s.yaml 파일 사용 (복사 불필요)
     echo "✅ Production 환경: 기본 k8s.yaml 파일 사용"
 else
-    cp -Rf ci/k8s-dev.yaml ci/k8s.yaml
+    if [ "${GIT_BRANCH}" = "crontab" ]; then
+      cp -Rf ci/k8s-crontab.yaml ci/k8s.yaml
+    else
+      cp -Rf ci/k8s-dev.yaml ci/k8s.yaml
+    fi
 fi
 
 # Secret 이름 처리 (정규화된 GIT_BRANCH 사용)
