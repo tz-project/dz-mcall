@@ -1,22 +1,22 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: dz-mcall-${GIT_BRANCH}
+  name: dz-mcall-GIT_BRANCH
   labels:
     org: tz
     team: devops
     project: mcall
-    environment: ${STAGING}
+    environment: STAGING
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: dz-mcall-${GIT_BRANCH}
+  name: dz-mcall-GIT_BRANCH
   labels:
     org: tz
     team: devops
     project: mcall
-    environment: ${STAGING}
+    environment: STAGING
 rules:
 # Leader election permissions
 - apiGroups: ["coordination.k8s.io"]
@@ -34,17 +34,17 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: dz-mcall-${GIT_BRANCH}
+  name: dz-mcall-GIT_BRANCH
   labels:
     org: tz
     team: devops
     project: mcall
-    environment: ${STAGING}
+    environment: STAGING
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: dz-mcall-${GIT_BRANCH}
+  name: dz-mcall-GIT_BRANCH
 subjects:
 - kind: ServiceAccount
-  name: dz-mcall-${GIT_BRANCH}
-  namespace: ${NAMESPACE}
+  name: dz-mcall-GIT_BRANCH
+  namespace: NAMESPACE

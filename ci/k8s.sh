@@ -132,6 +132,9 @@ cat ci/k8s.yaml
 
 # RBAC 리소스 배포 (먼저 배포)
 echo "🔐 RBAC 리소스 배포 중..."
+sed -i "s/STAGING/${STAGING}/g" ci/k8s-rbac.yaml
+sed -i "s/GIT_BRANCH/${SECRET_SUFFIX}/g" ci/k8s-rbac.yaml
+sed -i "s/NAMESPACE/${NAMESPACE}/g" ci/k8s-rbac.yaml
 kubectl apply -f ci/k8s-rbac.yaml
 
 # 기존 리소스 삭제 (실패해도 계속 진행)
