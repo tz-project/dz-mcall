@@ -54,10 +54,10 @@ kubectl apply -f k8s/k8s-crontab.yaml
 ### 2. Log Monitoring
 ```bash
 # Check leader pod logs
-kubectl logs -l app=tz-mcall-${GIT_BRANCH} -f
+kubectl logs -l app=dz-mcall-${GIT_BRANCH} -f
 
 # Check task processing status for specific pod
-kubectl get configmaps -l app=tz-mcall,task=true
+kubectl get configmaps -l app=dz-mcall,task=true
 ```
 
 ## Operation Flow
@@ -96,16 +96,16 @@ request:
 ### Task Status Check
 ```bash
 # Check completed tasks
-kubectl get configmaps -l app=tz-mcall,task=true -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.processed}{"\t"}{.metadata.annotations.processed-at}{"\n"}{end}'
+kubectl get configmaps -l app=dz-mcall,task=true -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.processed}{"\t"}{.metadata.annotations.processed-at}{"\n"}{end}'
 
 # Check tasks assigned to specific pod
-kubectl get configmaps -l app=tz-mcall,task=true,assigned-to=<pod-name>
+kubectl get configmaps -l app=dz-mcall,task=true,assigned-to=<pod-name>
 ```
 
 ### Leader Status Check
 ```bash
 # Check current leader
-kubectl get lease tz-mcall-leader -o jsonpath='{.spec.holderIdentity}'
+kubectl get lease dz-mcall-leader -o jsonpath='{.spec.holderIdentity}'
 ```
 
 ## Considerations

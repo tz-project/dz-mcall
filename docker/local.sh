@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #ROOTDIR=/Volumes/workspace
-#ROOTDIR=/Volumes/workspace/tz/tz-devops-utils/projects
+#ROOTDIR=/Volumes/workspace/tz/dz-devops-utils/projects
 #ROOTDIR=/vagrant/projects
 
 cd $ROOTDIR
@@ -27,17 +27,17 @@ mkdir -p src/github.com
 mkdir -p src/github.com/doohee323
 
 cd $GOPATH/src/github.com/doohee323
-git clone https://github.com/doohee323/tz-mcall.git
-cd tz-mcall
+git clone https://github.com/doohee323/dz-mcall.git
+cd dz-mcall
 
 export GO111MODULE=on
 #go env -w GO111MODULE=auto
-#go mod init github.com/doohee323/tz-mcall
+#go mod init github.com/doohee323/dz-mcall
 go mod init
 go mod tidy
 go get ./...
 go mod vendor
-go get -t github.com/doohee323/tz-mcall
+go get -t github.com/doohee323/dz-mcall
 
 sudo apt update -y
 sudo apt install golang-glide -y
@@ -60,13 +60,13 @@ exit
 sudo chown -Rf vagrant:vagrant /var/run/docker.sock
 
 # Build Docker image
-docker build -f docker/Dockerfile -t tz-mcall:latest .
+docker build -f docker/Dockerfile -t dz-mcall:latest .
 
 # Run container with webserver enabled
-docker run -d -p 3000:3000 --name tz-mcall-container tz-mcall:latest
+docker run -d -p 3000:3000 --name dz-mcall-container dz-mcall:latest
 
 # Alternative: Run with custom configuration
-# docker run -p 3000:3000 -v $(pwd)/etc/mcall.yaml:/app/mcall.yaml -it tz-mcall:latest
+# docker run -p 3000:3000 -v $(pwd)/etc/mcall.yaml:/app/mcall.yaml -it dz-mcall:latest
 
 # Test the running container
 sleep 5
@@ -77,9 +77,9 @@ curl http://localhost:3000/mcall/cmd/`echo $params | base64`
 curl http://localhost:3000/healthcheck
 
 # Container management
-# docker exec -it tz-mcall-container /bin/sh
-# docker stop tz-mcall-container
-# docker rm tz-mcall-container
+# docker exec -it dz-mcall-container /bin/sh
+# docker stop dz-mcall-container
+# docker rm dz-mcall-container
 
 # Test with external URL
 params='{"inputs":[{"input":"ls -al"},{"input":"pwd"}]}'

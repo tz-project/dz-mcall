@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tz-mcall-${GIT_BRANCH}
+  name: dz-mcall-${GIT_BRANCH}
   labels:
     org: tz
     team: devops
@@ -10,7 +10,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: tz-mcall-${GIT_BRANCH}
+      app: dz-mcall-${GIT_BRANCH}
   replicas: 1
   strategy:
     type: RollingUpdate
@@ -24,7 +24,7 @@ spec:
         team: devops
         project: mcall
         environment: ${STAGING}
-        app: tz-mcall-${GIT_BRANCH}
+        app: dz-mcall-${GIT_BRANCH}
     spec:
       imagePullSecrets:
         - name: tz-registrykey
@@ -33,7 +33,7 @@ spec:
         runAsUser: 1000
         fsGroup: 1000
       containers:
-      - name: tz-mcall-${GIT_BRANCH}
+      - name: dz-mcall-${GIT_BRANCH}
         image: ${REPOSITORY_TAG}
         imagePullPolicy: Always
         ports:
@@ -67,12 +67,12 @@ spec:
         - name: GIT_BRANCH
           valueFrom:
             configMapKeyRef:
-              name: tz-mcall-${GIT_BRANCH}
+              name: dz-mcall-${GIT_BRANCH}
               key: GIT_BRANCH
         - name: CONTAINER_ENV
           valueFrom:
             configMapKeyRef:
-              name: tz-mcall-${GIT_BRANCH}
+              name: dz-mcall-${GIT_BRANCH}
               key: container_env
         volumeMounts:
         - name: config-volume
@@ -83,7 +83,7 @@ spec:
       volumes:
       - name: config-volume
         configMap:
-          name: tz-mcall-config-${GIT_BRANCH}
+          name: dz-mcall-config-${GIT_BRANCH}
       - name: logs-volume
         emptyDir: {}
       nodeSelector:
@@ -94,7 +94,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: tz-mcall-${GIT_BRANCH}
+  name: dz-mcall-${GIT_BRANCH}
   labels:
     org: tz
     team: devops
@@ -102,7 +102,7 @@ metadata:
     environment: ${STAGING}
 spec:
   selector:
-    app: tz-mcall-${GIT_BRANCH}
+    app: dz-mcall-${GIT_BRANCH}
   type: NodePort
   ports:
     - port: 3000
@@ -114,7 +114,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tz-mcall-${GIT_BRANCH}
+  name: dz-mcall-${GIT_BRANCH}
   labels:
     org: tz
     team: devops
@@ -128,7 +128,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tz-mcall-config-${GIT_BRANCH}
+  name: dz-mcall-config-${GIT_BRANCH}
   labels:
     org: tz
     team: devops
@@ -161,7 +161,7 @@ data:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: tz-mcall-${GIT_BRANCH}
+  name: dz-mcall-${GIT_BRANCH}
   labels:
     org: tz
     team: devops
@@ -183,10 +183,10 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: tz-mcall-${GIT_BRANCH}
+            name: dz-mcall-${GIT_BRANCH}
             port:
               number: 3000
   tls:
     - hosts:
         - ${GIT_BRANCH}.mcall.${DOMAIN_NAME}
-      secretName: tz-mcall-${GIT_BRANCH}
+      secretName: dz-mcall-${GIT_BRANCH}

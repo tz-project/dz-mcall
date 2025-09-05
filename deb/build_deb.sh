@@ -9,16 +9,16 @@ cd ..
 GOOS=linux GOARCH=amd64 go build -o mcall-linux mcall.go
 
 # Create package directory structure
-mkdir -p deb/pkg-build/usr/tz-mcall
+mkdir -p deb/pkg-build/usr/dz-mcall
 
 # Copy the binary
-cp mcall-linux deb/pkg-build/usr/tz-mcall/mcall
+cp mcall-linux deb/pkg-build/usr/dz-mcall/mcall
 
 # Copy configuration files
-cp -r etc/* deb/pkg-build/usr/tz-mcall/etc/
+cp -r etc/* deb/pkg-build/usr/dz-mcall/etc/
 
 # Set proper permissions
-chmod 775 deb/pkg-build/usr/tz-mcall/mcall
+chmod 775 deb/pkg-build/usr/dz-mcall/mcall
 chmod 775 deb/pkg-build/DEBIAN/postinst
 
 cd deb
@@ -27,6 +27,6 @@ cd deb
 dpkg -b pkg-build
 
 # Rename the package
-mv pkg-build.deb tz-mcall.deb
+mv pkg-build.deb dz-mcall.deb
 
-echo "Package built successfully: tz-mcall.deb"
+echo "Package built successfully: dz-mcall.deb"

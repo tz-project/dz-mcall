@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tz-mcall
+  name: dz-mcall
   labels:
     org: tz
     team: devops
@@ -10,7 +10,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: tz-mcall
+      app: dz-mcall
   replicas: 2
   strategy:
     type: RollingUpdate
@@ -24,7 +24,7 @@ spec:
         team: devops
         project: mcall
         environment: prod
-        app: tz-mcall
+        app: dz-mcall
     spec:
       imagePullSecrets:
         - name: tz-registrykey
@@ -33,7 +33,7 @@ spec:
         runAsUser: 1000
         fsGroup: 1000
       containers:
-      - name: tz-mcall
+      - name: dz-mcall
         image: ${REPOSITORY_TAG}
         imagePullPolicy: Always
         ports:
@@ -67,12 +67,12 @@ spec:
         - name: GIT_BRANCH
           valueFrom:
             configMapKeyRef:
-              name: tz-mcall
+              name: dz-mcall
               key: GIT_BRANCH
         - name: CONTAINER_ENV
           valueFrom:
             configMapKeyRef:
-              name: tz-mcall
+              name: dz-mcall
               key: container_env
         volumeMounts:
         - name: config-volume
@@ -83,7 +83,7 @@ spec:
       volumes:
       - name: config-volume
         configMap:
-          name: tz-mcall-config
+          name: dz-mcall-config
       - name: logs-volume
         emptyDir: {}
       nodeSelector:
@@ -94,7 +94,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: tz-mcall
+  name: dz-mcall
   labels:
     org: tz
     team: devops
@@ -102,7 +102,7 @@ metadata:
     environment: prod
 spec:
   selector:
-    app: tz-mcall
+    app: dz-mcall
   type: NodePort
   ports:
     - port: 3000
@@ -114,7 +114,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tz-mcall
+  name: dz-mcall
   labels:
     org: tz
     team: devops
@@ -128,7 +128,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tz-mcall-config
+  name: dz-mcall-config
   labels:
     org: tz
     team: devops
@@ -161,7 +161,7 @@ data:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: tz-mcall
+  name: dz-mcall
   labels:
     org: tz
     team: devops
@@ -185,7 +185,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: tz-mcall
+            name: dz-mcall
             port:
               number: 3000
 
@@ -193,7 +193,7 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: tz-mcall
+  name: dz-mcall
   labels:
     org: tz
     team: devops
@@ -203,7 +203,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: tz-mcall
+    name: dz-mcall
   minReplicas: 2
   maxReplicas: 10
   metrics:

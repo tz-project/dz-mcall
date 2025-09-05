@@ -1,4 +1,4 @@
-module github.com/doohee323/tz-mcall
+module github.com/doohee323/dz-mcall
 
 go 1.18
 

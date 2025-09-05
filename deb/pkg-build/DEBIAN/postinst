@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # Create runit service directory
-sudo mkdir -p /etc/service/tz-mcall
-sudo rm -Rf /etc/service/tz-mcall/run
-sudo touch /etc/service/tz-mcall/run
-sudo chmod 777 /etc/service/tz-mcall/run
+sudo mkdir -p /etc/service/dz-mcall
+sudo rm -Rf /etc/service/dz-mcall/run
+sudo touch /etc/service/dz-mcall/run
+sudo chmod 777 /etc/service/dz-mcall/run
 
 # Create runit service script
-sudo echo '#!/bin/sh' >> /etc/service/tz-mcall/run
-sudo echo 'cd /usr/tz-mcall' >> /etc/service/tz-mcall/run
-sudo echo './mcall -w=true &' >> /etc/service/tz-mcall/run
+sudo echo '#!/bin/sh' >> /etc/service/dz-mcall/run
+sudo echo 'cd /usr/dz-mcall' >> /etc/service/dz-mcall/run
+sudo echo './mcall -w=true &' >> /etc/service/dz-mcall/run
 
 # Create log directory
 sudo mkdir -p /var/log/mcall
@@ -17,10 +17,10 @@ sudo chmod 755 /var/log/mcall
 
 # Set proper ownership (adjust user:group as needed)
 # sudo chown -Rf root:root /var/log/mcall
-# sudo chown -Rf root:root /etc/service/tz-mcall
+# sudo chown -Rf root:root /etc/service/dz-mcall
 
 # Start the service
-sv start /etc/service/tz-mcall
+sv start /etc/service/dz-mcall
 
-echo "tz-mcall service installed and started successfully"
+echo "dz-mcall service installed and started successfully"
 

@@ -1,12 +1,12 @@
 version: '3.8'
 
 services:
-  tz-mcall:
+  dz-mcall:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: tz-mcall:latest
-    container_name: tz-mcall-container
+    image: dz-mcall:latest
+    container_name: dz-mcall-container
     ports:
       - "3000:3000"
     volumes:
@@ -29,7 +29,7 @@ services:
   # Optional: Add a reverse proxy (nginx)
   nginx:
     image: nginx:alpine
-    container_name: tz-mcall-nginx
+    container_name: dz-mcall-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -37,7 +37,7 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
-      - tz-mcall
+      - dz-mcall
     restart: unless-stopped
     networks:
       - mcall-network

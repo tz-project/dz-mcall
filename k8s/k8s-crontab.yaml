@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: tz-mcall-${GIT_BRANCH}
+  name: dz-mcall-${GIT_BRANCH}
   labels:
     org: tz
     team: devops
@@ -23,10 +23,10 @@ spec:
             team: devops
             project: mcall
             environment: ${STAGING}
-            app: tz-mcall-${GIT_BRANCH}
+            app: dz-mcall-${GIT_BRANCH}
         spec:
           restartPolicy: OnFailure
-          serviceAccountName: tz-mcall-${GIT_BRANCH}
+          serviceAccountName: dz-mcall-${GIT_BRANCH}
           imagePullSecrets:
             - name: tz-registrykey
           securityContext:
@@ -34,7 +34,7 @@ spec:
             runAsUser: 1000
             fsGroup: 1000
           containers:
-            - name: tz-mcall-${GIT_BRANCH}
+            - name: dz-mcall-${GIT_BRANCH}
               image: ${REPOSITORY_TAG}
               imagePullPolicy: Always
               resources:
@@ -68,6 +68,6 @@ spec:
           volumes:
           - name: config-volume
             configMap:
-              name: tz-mcall-config-${GIT_BRANCH}
+              name: dz-mcall-config-${GIT_BRANCH}
           - name: logs-volume
             emptyDir: {}

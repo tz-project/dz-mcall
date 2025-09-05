@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# Configuration script for tz-mcall Kubernetes deployment
+# Configuration script for dz-mcall Kubernetes deployment
 # Usage: ./config.sh <GIT_BRANCH> <STAGING>
 
 # Check required arguments
@@ -15,7 +15,7 @@ fi
 GIT_BRANCH=$1
 STAGING=$2
 
-echo "Configuring tz-mcall for branch: $GIT_BRANCH, staging: $STAGING"
+echo "Configuring dz-mcall for branch: $GIT_BRANCH, staging: $STAGING"
 
 # Clean up existing configuration
 rm -f etc/mcall.yaml

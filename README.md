@@ -1,4 +1,4 @@
-# tz-mcall
+# dz-mcall
 
 [![Go Version](https://img.shields.io/badge/Go-1.18+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -40,8 +40,8 @@ A high-performance, concurrent HTTP request and command execution tool written i
 
 ```bash
 # Clone the repository
-git clone https://github.com/doohee323/tz-mcall.git
-cd tz-mcall
+git clone https://github.com/doohee323/dz-mcall.git
+cd dz-mcall
 
 # Install dependencies
 go mod tidy
@@ -57,7 +57,7 @@ chmod +x mcall
 ### Using Go Modules
 
 ```bash
-go get github.com/doohee323/tz-mcall
+go get github.com/doohee323/dz-mcall
 ```
 
 ## 🚀 Quick Start
@@ -239,16 +239,16 @@ Execute HTTP GET/POST requests.
 
 #### Build Image
 ```bash
-docker build -f docker/Dockerfile -t tz-mcall:latest .
+docker build -f docker/Dockerfile -t dz-mcall:latest .
 ```
 
 #### Run Container
 ```bash
 # Basic run
-docker run -d -p 3000:3000 tz-mcall:latest
+docker run -d -p 3000:3000 dz-mcall:latest
 
 # With custom configuration
-docker run -p 3000:3000 -v $(pwd)/etc/mcall.yaml:/app/mcall.yaml tz-mcall:latest
+docker run -p 3000:3000 -v $(pwd)/etc/mcall.yaml:/app/mcall.yaml dz-mcall:latest
 ```
 
 #### Docker Compose
@@ -284,7 +284,7 @@ cd deb
 
 #### Install Package
 ```bash
-sudo dpkg -i tz-mcall.deb
+sudo dpkg -i dz-mcall.deb
 ```
 
 ## 🛠️ Development
@@ -292,7 +292,7 @@ sudo dpkg -i tz-mcall.deb
 ### Project Structure
 
 ```
-tz-mcall/
+dz-mcall/
 ├── mcall.go              # Main application code
 ├── mcall_test.go         # Test files
 ├── etc/                  # Configuration files
@@ -373,7 +373,7 @@ glide get github.com/spf13/viper  # Add new dependency
 curl http://localhost:3000/healthcheck
 
 # Kubernetes health check
-kubectl get pods -n devops -l app=tz-mcall
+kubectl get pods -n devops -l app=dz-mcall
 ```
 
 ### Logging
@@ -383,10 +383,10 @@ kubectl get pods -n devops -l app=tz-mcall
 tail -f /var/log/mcall/mcall.log
 
 # View container logs
-docker logs tz-mcall-container
+docker logs dz-mcall-container
 
 # View Kubernetes logs
-kubectl logs -f deployment/tz-mcall -n devops
+kubectl logs -f deployment/dz-mcall -n devops
 ```
 
 ### Metrics
@@ -460,6 +460,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ by the tz-mcall team**
+**Made with ❤️ by the dz-mcall team**
 
 
