@@ -8,6 +8,7 @@ pipeline {
 
     environment {
         GIT_BRANCH = "${env.BRANCH_NAME ?: env.GIT_BRANCH ?: env.CHANGE_BRANCH ?: 'main'}"
+        STAGING = "${env.BRANCH_NAME == "main" ? "prod" : env.BRANCH_NAME == "qa" ? "qa" : "dev"}"
         GIT_COMMITTER_EMAIL = "doohee323@gmail.com"
 
         BUILD_NUMBER = "${env.BUILD_NUMBER ?: 'latest'}"
