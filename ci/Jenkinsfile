@@ -92,7 +92,7 @@ pipeline {
                                 sh '''
                                     export PATH=$PATH:.:
                                     chmod +x ci/k8s.sh
-                                    echo "🚀 Kubernetes 배포 시작..."
+                                    echo "🚀 Starting Kubernetes deployment..."
                                     echo "  BUILD_NUMBER: ${BUILD_NUMBER}"
                                     echo "  GIT_BRANCH: ${GIT_BRANCH}"
                                     echo "  NAMESPACE: ${NAMESPACE}"

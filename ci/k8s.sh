@@ -1,15 +1,15 @@
 #!/bin/sh
 
-# Kubernetes 배포 스크립트
+# Kubernetes deployment script
 set -e
 
-# 환경 변수 설정
+# Environment variable setup
 BUILD_NUMBER=${1:-"latest"}
 GIT_BRANCH=${2:-"main"}
 NAMESPACE=${3:-"default"}
 ACTION=${4:-"deploy"}
 
-# 브랜치별 namespace 설정 (main/qa는 devops, 기타는 devops-dev)
+# Namespace setup by branch (main/qa use devops, others use devops-dev)
 if [ "${NAMESPACE}" = "default" ]; then
     if [ "${GIT_BRANCH}" = "main" ] || [ "${GIT_BRANCH}" = "qa" ]; then
         NAMESPACE="devops"
@@ -18,48 +18,48 @@ if [ "${NAMESPACE}" = "default" ]; then
     fi
 fi
 
-echo "🔍 실행 정보:"
+echo "🔍 Execution info:"
 echo "BUILD_NUMBER: ${BUILD_NUMBER}"
 echo "GIT_BRANCH: ${GIT_BRANCH}"
 echo "NAMESPACE: ${NAMESPACE}"
 echo "ACTION: ${ACTION}"
 
-# 배포 함수
+# Deployment function
 deploy_to_kubernetes() {
-    echo "🔍 배포 정보:"
+    echo "🔍 Deployment info:"
     echo "BUILD_NUMBER: ${BUILD_NUMBER}"
     echo "GIT_BRANCH: ${GIT_BRANCH}"
     echo "NAMESPACE: ${NAMESPACE}"
     
-    # kubectl 다운로드 (배포 시에만)
-    echo "📥 kubectl 다운로드 중..."
+    # Download kubectl (only during deployment)
+    echo "📥 Downloading kubectl..."
     wget -q https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x ./kubectl
 
-    # Git 정보 확인
-    echo "--- Git 정보 ---"
-    git rev-parse --abbrev-ref HEAD || echo "git rev-parse 명령어 실패"
+    # Check Git information
+    echo "--- Git Information ---"
+    git rev-parse --abbrev-ref HEAD || echo "git rev-parse command failed"
 
 
 
-# BUILD_NUMBER가 null이면 latest로 설정
+# Set BUILD_NUMBER to latest if null
 if [ -z "${BUILD_NUMBER}" ] || [ "${BUILD_NUMBER}" = "null" ]; then
     BUILD_NUMBER="latest"
 fi
 
-# GIT_BRANCH가 null이면 Git 명령어로 확인
+# Check GIT_BRANCH with Git command if null
 if [ -z "${GIT_BRANCH}" ] || [ "${GIT_BRANCH}" = "null" ]; then
-    echo "GIT_BRANCH가 null이므로 Git 명령어로 확인합니다"
+    echo "GIT_BRANCH is null, checking with Git command"
     GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
-    echo "Git 명령어로 확인된 브랜치: ${GIT_BRANCH}"
+    echo "Branch confirmed by Git command: ${GIT_BRANCH}"
 fi
 
-# origin/ 접두사 제거
+# Remove origin/ prefix
 GIT_BRANCH=$(echo "${GIT_BRANCH}" | sed 's|^origin/||')
-# Kubernetes 리소스 이름 규칙에 맞게 _ 를 - 로 변경
+# Convert _ to - for Kubernetes resource naming rules
 GIT_BRANCH=$(echo "${GIT_BRANCH}" | sed 's|_|-|g')
-echo "🔍 정리된 GIT_BRANCH: ${GIT_BRANCH}"
+echo "🔍 Sanitized GIT_BRANCH: ${GIT_BRANCH}"
 
-# 브랜치에 따른 STAGING과 도메인 설정
+# STAGING and domain setup by branch
 if [ "${GIT_BRANCH}" = "main" ]; then
     STAGING="prod"
     DOMAIN_SUFFIX=""
@@ -71,17 +71,17 @@ else
     DOMAIN_SUFFIX="-${GIT_BRANCH}"
 fi
 
-# 도메인 생성 (통합 배포)
+# Domain generation (unified deployment)
 DOMAIN="mcall${DOMAIN_SUFFIX}.drillquiz.com"
 
 echo "✅ STAGING: ${STAGING}"
-echo "✅ 생성된 도메인: ${DOMAIN}"
+echo "✅ Generated domain: ${DOMAIN}"
 
 if [ "${STAGING}" = "qa" ]; then
     cp -Rf ci/k8s-qa.yaml ci/k8s.yaml
 elif [ "${STAGING}" = "prod" ]; then
-    # production 환경에서는 기본 k8s.yaml 파일 사용 (복사 불필요)
-    echo "✅ Production 환경: 기본 k8s.yaml 파일 사용"
+    # Use default k8s.yaml file in production environment (no copy needed)
+    echo "✅ Production environment: Using default k8s.yaml file"
 else
     if [ "${GIT_BRANCH}" = "access-leader" ] || [ "${GIT_BRANCH}" = "block-leader" ]; then
       cp -Rf ci/k8s-deployment.yaml ci/k8s.yaml
@@ -92,30 +92,30 @@ else
     fi
 fi
 
-# Secret 이름 처리 (정규화된 GIT_BRANCH 사용)
+# Secret name processing (using sanitized GIT_BRANCH)
 SECRET_SUFFIX="${GIT_BRANCH}"
 if [ "${SECRET_SUFFIX}" = "null" ]; then
     SECRET_SUFFIX="main"
 fi
-# / 문자를 - 로 변경
+# Convert / to -
 SECRET_SUFFIX=$(echo "${SECRET_SUFFIX}" | sed 's|/|-|g')
-echo "Secret 이름에 사용할 SUFFIX: ${SECRET_SUFFIX}"
+echo "SUFFIX for secret name: ${SECRET_SUFFIX}"
 
-# 환경 변수 파일 치환 (먼저 수행)
-echo "🔧 환경 변수 파일 치환 중..."
-echo "🔍 치환할 도메인: ${DOMAIN}"
+# Environment variable file substitution (performed first)
+echo "🔧 Substituting environment variable files..."
+echo "🔍 Domain to substitute: ${DOMAIN}"
 
-echo "✅ 환경 변수 파일 치환 완료"
+echo "✅ Environment variable file substitution completed"
 
-# k8s.yaml 파일 치환
-echo "🔧 k8s.yaml 파일 치환 중..."
-echo "치환할 값들:"
+# k8s.yaml file substitution
+echo "🔧 Substituting k8s.yaml file..."
+echo "Values to substitute:"
 echo "  BUILD_NUMBER: ${BUILD_NUMBER}"
 echo "  GIT_BRANCH: ${SECRET_SUFFIX}"
 echo "  STAGING: ${STAGING}"
 echo "  DOMAIN: ${DOMAIN}"
 
-# DOMAIN_PLACEHOLDER 치환
+# DOMAIN_PLACEHOLDER substitution
 sed -i "s/DOMAIN_PLACEHOLDER/${DOMAIN}/g" ci/k8s.yaml
 sed -i "s/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUMBER}/g" ci/k8s.yaml
 sed -i "s/STAGING/${STAGING}/g" ci/k8s.yaml
@@ -125,7 +125,7 @@ GOOGLE_OAUTH_CLIENT_SECRET=$(echo -n ${GOOGLE_OAUTH_CLIENT_SECRET} | base64)
 MINIO_SECRET_KEY=$(echo -n ${MINIO_SECRET_KEY} | base64)
 POSTGRES_PASSWORD=$(echo -n ${POSTGRES_PASSWORD} | base64)
 OPENAI_API_KEY=$(echo -n ${OPENAI_API_KEY} | base64 -w 0)
-# 한 줄로 base64 인코딩
+# Base64 encoding in one line
 
 sed -ie "s|#GOOGLE_OAUTH_CLIENT_SECRET|${GOOGLE_OAUTH_CLIENT_SECRET}|g" ci/k8s.yaml
 sed -ie "s|#MINIO_SECRET_KEY|${MINIO_SECRET_KEY}|g" ci/k8s.yaml
@@ -134,30 +134,30 @@ awk -v key="$OPENAI_API_KEY" '{gsub(/#OPENAI_API_KEY/, key)}1' ci/k8s.yaml > ci/
 
 cat ci/k8s.yaml
 
-# RBAC 리소스 배포 (먼저 배포)
-echo "🔐 RBAC 리소스 배포 중..."
+# Deploy RBAC resources (deploy first)
+echo "🔐 Deploying RBAC resources..."
 sed -i "s/STAGING/${STAGING}/g" ci/k8s-rbac.yaml
 sed -i "s/GIT_BRANCH/${SECRET_SUFFIX}/g" ci/k8s-rbac.yaml
 sed -i "s/NAMESPACE/${NAMESPACE}/g" ci/k8s-rbac.yaml
 kubectl apply -f ci/k8s-rbac.yaml
 
-# 기존 리소스 삭제 (실패해도 계속 진행)
-echo "🗑️  기존 리소스 삭제 중..."
-kubectl -n ${NAMESPACE} delete -f ci/k8s.yaml || echo "삭제할 리소스가 없습니다 (정상)"
+# Delete existing resources (continue even if failed)
+echo "🗑️  Deleting existing resources..."
+kubectl -n ${NAMESPACE} delete -f ci/k8s.yaml || echo "No resources to delete (normal)"
 
-# 새 리소스 배포
-echo "🚀 새 리소스 배포 중..."
+# Deploy new resources
+echo "🚀 Deploying new resources..."
 kubectl -n ${NAMESPACE} apply -f ci/k8s.yaml
 }
 
-# 메인 실행 로직
+# Main execution logic
 case "${ACTION}" in
     "deploy")
         deploy_to_kubernetes
         ;;
     *)
-        echo "❌ 잘못된 ACTION: ${ACTION}"
-        echo "사용법: $0 <BUILD_NUMBER> <GIT_BRANCH> <NAMESPACE> [deploy]"
+        echo "❌ Invalid ACTION: ${ACTION}"
+        echo "Usage: $0 <BUILD_NUMBER> <GIT_BRANCH> <NAMESPACE> [deploy]"
         exit 1
         ;;
 esac
