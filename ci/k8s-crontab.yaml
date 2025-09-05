@@ -1,12 +1,12 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: dz-mcall-${GIT_BRANCH}
+  name: dz-mcall-GIT_BRANCH
   labels:
     org: tz
     team: devops
     project: mcall
-    environment: ${STAGING}
+    environment: STAGING
 spec:
   schedule: "*/5 * * * *"
   concurrencyPolicy: Allow
@@ -14,19 +14,19 @@ spec:
   failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
-      parallelism: ${PARALLELISM:-3}  # Number of pods to run simultaneously (default: 3)
-      completions: ${COMPLETIONS:-3}  # Number of pods that must complete (default: 3)
+      parallelism: 3  # Number of pods to run simultaneously (default: 3)
+      completions: 3  # Number of pods that must complete (default: 3)
       template:
         metadata:
           labels:
             org: tz
             team: devops
             project: mcall
-            environment: ${STAGING}
-            app: dz-mcall-${GIT_BRANCH}
+            environment: STAGING
+            app: dz-mcall-GIT_BRANCH
         spec:
           restartPolicy: OnFailure
-          serviceAccountName: dz-mcall-${GIT_BRANCH}
+          serviceAccountName: dz-mcall-GIT_BRANCH
           imagePullSecrets:
             - name: tz-registrykey
           securityContext:
@@ -34,8 +34,8 @@ spec:
             runAsUser: 1000
             fsGroup: 1000
           containers:
-            - name: dz-mcall-${GIT_BRANCH}
-              image: ${REPOSITORY_TAG}
+            - name: dz-mcall-GIT_BRANCH
+              image: doohee323/dz-mcall:BUILD_NUMBER_PLACEHOLDER
               imagePullPolicy: Always
               resources:
                 requests:
@@ -46,7 +46,7 @@ spec:
                   cpu: "200m"
               env:
               - name: GIT_BRANCH
-                value: ${GIT_BRANCH}
+                value: GIT_BRANCH
               - name: CONTAINER_ENV
                 value: 'kubernetes'
               - name: LEADER_ELECTION
@@ -68,6 +68,6 @@ spec:
           volumes:
           - name: config-volume
             configMap:
-              name: dz-mcall-config-${GIT_BRANCH}
+              name: dz-mcall-config-GIT_BRANCH
           - name: logs-volume
             emptyDir: {}
