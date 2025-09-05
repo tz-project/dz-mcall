@@ -86,9 +86,6 @@ spec:
           name: dz-mcall-config-GIT_BRANCH
       - name: logs-volume
         emptyDir: {}
-      nodeSelector:
-        team: devops
-        environment: STAGING
 
 ---
 apiVersion: v1
