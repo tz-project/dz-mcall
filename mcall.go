@@ -1206,6 +1206,7 @@ func mainExec(args Args) error {
 
 	// Run application
 	if config.WebServer.Enable {
+		fmt.Printf("Starting mcall webserver on %s:%s\n", config.WebServer.Host, config.WebServer.Port)
 		app.webserver()
 	} else if app.leaderElection {
 		// Run with leader election
@@ -1267,7 +1268,8 @@ func mainExec(args Args) error {
 }
 
 func main() {
-	if len(os.Args) < 2 {
+	// Check if help is requested or no arguments provided
+	if len(os.Args) == 1 || (len(os.Args) == 2 && (os.Args[1] == "-help" || os.Args[1] == "--help" || os.Args[1] == "help")) {
 		fmt.Println("Usage: mcall <command> [options]")
 		fmt.Println("Commands:")
 		fmt.Println("  -i      - Execute command or HTTP request")
