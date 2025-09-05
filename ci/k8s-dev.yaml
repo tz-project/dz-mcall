@@ -74,6 +74,8 @@ spec:
             configMapKeyRef:
               name: dz-mcall-GIT_BRANCH
               key: container_env
+        command: ["/app/mcall"]
+        args: ["-w=true", "-p=3000", "-c=/app/etc/mcall.yaml"]
         volumeMounts:
         - name: config-volume
           mountPath: /app/etc

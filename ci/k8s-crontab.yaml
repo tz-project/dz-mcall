@@ -59,6 +59,8 @@ spec:
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.name
+              command: ["/app/mcall"]
+              args: ["-c=/app/etc/mcall.yaml"]
               volumeMounts:
               - name: config-volume
                 mountPath: /app/etc

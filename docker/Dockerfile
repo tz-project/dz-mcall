@@ -45,5 +45,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/healthcheck || exit 1
 
-# Default command with webserver enabled
-CMD ["/app/mcall", "-w=true", "-p=3000", "-c=/app/mcall.yaml"]
+# Default command (will be overridden by Kubernetes)
+CMD ["/app/mcall"]
