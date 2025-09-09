@@ -133,11 +133,10 @@ func testMainExec(args Args) error {
 			}
 		} else if config.Request.Input != "" {
 			// Parse config file input
-			inputs, types, names = app.parseConfigInput(config.Request.Input)
-		}
-
-		if len(inputs) > 0 {
-			app.makeResponse(inputs, types, names)
+			inputs, types, names, expects := app.parseConfigInput(config.Request.Input)
+			if len(inputs) > 0 {
+				app.makeResponse(inputs, types, names, expects)
+			}
 		}
 	}
 
@@ -248,13 +247,14 @@ func TestCallFetch(t *testing.T) {
 	fetchedInput := NewFetchedInput()
 	pipeline := NewPipeline()
 
-	cf := NewCallFetch(fetchedInput, pipeline, "echo hello", RequestTypeCmd, "test")
+	cf := NewCallFetch(fetchedInput, pipeline, "echo hello", RequestTypeCmd, "test", "")
 	assert.NotNil(t, cf)
 
 	// Test CallFetch creation
 	assert.Equal(t, "echo hello", cf.input)
 	assert.Equal(t, RequestTypeCmd, cf.sType)
 	assert.Equal(t, "test", cf.name)
+	assert.Equal(t, "", cf.expect)
 	assert.NotNil(t, cf.result)
 }
 
@@ -814,4 +814,403 @@ func TestIntegrationScenarios(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestExpectValidation tests the expect validation functionality
+func TestExpectValidation(t *testing.T) {
+	pipeline := NewPipeline()
+
+	tests := []struct {
+		name       string
+		input      string
+		sType      string
+		taskName   string
+		expect     string
+		shouldPass bool
+	}{
+		{
+			name:       "String validation - success",
+			input:      "echo hello world",
+			sType:      RequestTypeCmd,
+			taskName:   "test",
+			expect:     "hello",
+			shouldPass: true,
+		},
+		{
+			name:       "String validation - failure",
+			input:      "echo goodbye world",
+			sType:      RequestTypeCmd,
+			taskName:   "test",
+			expect:     "hello",
+			shouldPass: false,
+		},
+		{
+			name:       "Multiple string validation - success",
+			input:      "echo hello world",
+			sType:      RequestTypeCmd,
+			taskName:   "test",
+			expect:     "hello|goodbye",
+			shouldPass: true,
+		},
+		{
+			name:       "Multiple string validation - failure",
+			input:      "echo goodbye world",
+			sType:      RequestTypeCmd,
+			taskName:   "test",
+			expect:     "hello|test",
+			shouldPass: false,
+		},
+		{
+			name:       "Count validation - success",
+			input:      "echo 5",
+			sType:      RequestTypeCmd,
+			taskName:   "test",
+			expect:     "$count < 10",
+			shouldPass: true,
+		},
+		{
+			name:       "Count validation - failure",
+			input:      "echo 15",
+			sType:      RequestTypeCmd,
+			taskName:   "test",
+			expect:     "$count < 10",
+			shouldPass: false,
+		},
+		{
+			name:       "Count validation - greater than success",
+			input:      "echo 15",
+			sType:      RequestTypeCmd,
+			taskName:   "test",
+			expect:     "$count > 10",
+			shouldPass: true,
+		},
+		{
+			name:       "Count validation - greater than failure",
+			input:      "echo 5",
+			sType:      RequestTypeCmd,
+			taskName:   "test",
+			expect:     "$count > 10",
+			shouldPass: false,
+		},
+		{
+			name:       "Empty expect - should pass",
+			input:      "echo hello",
+			sType:      RequestTypeCmd,
+			taskName:   "test",
+			expect:     "",
+			shouldPass: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new FetchedInput for each test to avoid conflicts
+			testFetchedInput := NewFetchedInput()
+			cf := NewCallFetch(testFetchedInput, pipeline, tt.input, tt.sType, tt.taskName, tt.expect)
+			err := cf.Execute()
+
+			if tt.shouldPass {
+				assert.NoError(t, err, "Expected validation to pass for %s", tt.name)
+			} else {
+				assert.Error(t, err, "Expected validation to fail for %s", tt.name)
+			}
+		})
+	}
+}
+
+// TestCallFetchWithExpect tests CallFetch with expect parameter
+func TestCallFetchWithExpect(t *testing.T) {
+	fetchedInput := NewFetchedInput()
+	pipeline := NewPipeline()
+
+	tests := []struct {
+		name     string
+		input    string
+		sType    string
+		taskName string
+		expect   string
+	}{
+		{
+			name:     "Command with string expect",
+			input:    "echo hello world",
+			sType:    RequestTypeCmd,
+			taskName: "test-command",
+			expect:   "hello",
+		},
+		{
+			name:     "Command with count expect",
+			input:    "echo 42",
+			sType:    RequestTypeCmd,
+			taskName: "test-count",
+			expect:   "$count > 40",
+		},
+		{
+			name:     "Command with multiple expect",
+			input:    "echo success",
+			sType:    RequestTypeCmd,
+			taskName: "test-multiple",
+			expect:   "success|ok|done",
+		},
+		{
+			name:     "Command without expect",
+			input:    "echo hello",
+			sType:    RequestTypeCmd,
+			taskName: "test-no-expect",
+			expect:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cf := NewCallFetch(fetchedInput, pipeline, tt.input, tt.sType, tt.taskName, tt.expect)
+			assert.NotNil(t, cf)
+			assert.Equal(t, tt.input, cf.input)
+			assert.Equal(t, tt.sType, cf.sType)
+			assert.Equal(t, tt.taskName, cf.name)
+			assert.Equal(t, tt.expect, cf.expect)
+			assert.NotNil(t, cf.result)
+		})
+	}
+}
+
+// TestParseConfigInputWithExpect tests parsing config input with expect field
+func TestParseConfigInputWithExpect(t *testing.T) {
+	config := &Config{}
+	app := NewApp(config)
+
+	tests := []struct {
+		name            string
+		inputStr        string
+		expectedInputs  []string
+		expectedTypes   []string
+		expectedNames   []string
+		expectedExpects []string
+	}{
+		{
+			name: "Single input with expect",
+			inputStr: `{
+				"inputs": [
+					{
+						"input": "echo hello",
+						"type": "cmd",
+						"name": "test",
+						"expect": "hello"
+					}
+				]
+			}`,
+			expectedInputs:  []string{"echo hello"},
+			expectedTypes:   []string{"cmd"},
+			expectedNames:   []string{"test"},
+			expectedExpects: []string{"hello"},
+		},
+		{
+			name: "Multiple inputs with expects",
+			inputStr: `{
+				"inputs": [
+					{
+						"input": "echo hello",
+						"type": "cmd",
+						"name": "test1",
+						"expect": "hello"
+					},
+					{
+						"input": "echo 42",
+						"type": "cmd",
+						"name": "test2",
+						"expect": "$count > 40"
+					}
+				]
+			}`,
+			expectedInputs:  []string{"echo hello", "echo 42"},
+			expectedTypes:   []string{"cmd", "cmd"},
+			expectedNames:   []string{"test1", "test2"},
+			expectedExpects: []string{"hello", "$count > 40"},
+		},
+		{
+			name: "Input without expect field",
+			inputStr: `{
+				"inputs": [
+					{
+						"input": "echo hello",
+						"type": "cmd",
+						"name": "test"
+					}
+				]
+			}`,
+			expectedInputs:  []string{"echo hello"},
+			expectedTypes:   []string{"cmd"},
+			expectedNames:   []string{"test"},
+			expectedExpects: []string{""},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inputs, types, names, expects := app.parseConfigInput(tt.inputStr)
+
+			assert.Equal(t, tt.expectedInputs, inputs)
+			assert.Equal(t, tt.expectedTypes, types)
+			assert.Equal(t, tt.expectedNames, names)
+			assert.Equal(t, tt.expectedExpects, expects)
+		})
+	}
+}
+
+// TestParseInputParamsWithExpect tests parsing input parameters with expect field
+func TestParseInputParamsWithExpect(t *testing.T) {
+	config := &Config{}
+	app := NewApp(config)
+
+	tests := []struct {
+		name            string
+		paramStr        string
+		expectedInputs  []string
+		expectedTypes   []string
+		expectedNames   []string
+		expectedExpects []string
+	}{
+		{
+			name: "JSON params with expect",
+			paramStr: `{
+				"inputs": [
+					{
+						"input": "echo hello",
+						"type": "cmd",
+						"name": "test",
+						"expect": "hello"
+					}
+				]
+			}`,
+			expectedInputs:  []string{"echo hello"},
+			expectedTypes:   []string{"cmd"},
+			expectedNames:   []string{"test"},
+			expectedExpects: []string{"hello"},
+		},
+		{
+			name:            "Base64 encoded params with expect",
+			paramStr:        "eyJpbnB1dHMiOlt7ImlucHV0IjoiZWNobyBoZWxsbyIsInR5cGUiOiJjbWQiLCJuYW1lIjoidGVzdCIsImV4cGVjdCI6ImhlbGxvIn1dfQ==",
+			expectedInputs:  []string{"echo hello"},
+			expectedTypes:   []string{"cmd"},
+			expectedNames:   []string{"test"},
+			expectedExpects: []string{"hello"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inputs, types, names, expects := app.parseInputParams(tt.paramStr)
+
+			assert.Equal(t, tt.expectedInputs, inputs)
+			assert.Equal(t, tt.expectedTypes, types)
+			assert.Equal(t, tt.expectedNames, names)
+			assert.Equal(t, tt.expectedExpects, expects)
+		})
+	}
+}
+
+// TestExpectValidationScenarios tests various expect validation scenarios
+func TestExpectValidationScenarios(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     Args
+		expected error
+	}{
+		{
+			name: "Command with string expect validation",
+			args: Args{
+				"i":        "echo hello world",
+				"loglevel": "DEBUG",
+				"worker":   1,
+			},
+			expected: nil,
+		},
+		{
+			name: "Command with count expect validation",
+			args: Args{
+				"i":        "echo 42",
+				"loglevel": "DEBUG",
+				"worker":   1,
+			},
+			expected: nil,
+		},
+		{
+			name: "Multiple commands with different expects",
+			args: Args{
+				"i":        "echo hello,echo 42,echo success",
+				"loglevel": "DEBUG",
+				"worker":   3,
+			},
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := testMainExec(tt.args)
+			if tt.expected == nil {
+				assert.NoError(t, result)
+			} else {
+				assert.Error(t, result)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestExpectIntegrationWithConfig tests expect functionality with config file
+func TestExpectIntegrationWithConfig(t *testing.T) {
+	// Create a temporary config file for testing
+	testConfig := `request:
+  subject: "test-expect"
+  timeout: 5
+  input: |
+    {
+      "inputs": [
+        {
+          "name": "test-string",
+          "type": "cmd",
+          "input": "echo hello world",
+          "expect": "hello"
+        },
+        {
+          "name": "test-count",
+          "type": "cmd",
+          "input": "echo 42",
+          "expect": "$count > 40"
+        },
+        {
+          "name": "test-multiple",
+          "type": "cmd",
+          "input": "echo success",
+          "expect": "success|ok|done"
+        }
+      ]
+    }
+response:
+  format: json
+worker:
+  number: 2
+log:
+  level: debug
+  file: /tmp/mcall_test.log
+webserver:
+  enable: false`
+
+	// Write test config to temporary file
+	tmpFile := "/tmp/mcall_test_config.yaml"
+	err := os.WriteFile(tmpFile, []byte(testConfig), 0644)
+	if err != nil {
+		t.Skipf("Could not create test config file: %v", err)
+		return
+	}
+	defer os.Remove(tmpFile)
+
+	// Test with config file
+	args := Args{
+		"c":        tmpFile,
+		"loglevel": "DEBUG",
+	}
+
+	result := testMainExec(args)
+	assert.NoError(t, result)
 }

@@ -15,8 +15,8 @@ request:
         {
             "inputs":
                 [
-                    {"name": "jenkins", "type":"get", "input":"http://jenkins.tzcorp.com/"},
-                    {"name": "tzcorp-dev-redis", "type":"cmd", "input":"telnet redis-dev.tzcorp.com 6379"}
+                    {"name": "jenkins", "type":"get", "input":"http://jenkins.tzcorp.com/", "expect": "200|301|302"},
+                    {"name": "tzcorp-dev-redis", "type":"cmd", "input":"telnet redis-dev.tzcorp.com 6379", "expect": "Escape character is"}
                 ]
         }
 

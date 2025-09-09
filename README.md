@@ -11,6 +11,7 @@ A high-performance, concurrent HTTP request and command execution tool written i
 - Concurrent Processing: Configurable worker pools for high throughput
 - Real-time Monitoring: Web interface with health checks
 - Flexible Configuration: YAML configuration files with environment overrides
+- Response Validation: Built-in expect functionality for validating command/HTTP responses
 - Multiple Deployment Options: Docker, Kubernetes, Debian packages
 - Comprehensive Logging: Structured logging with configurable levels
 - Health Monitoring: Built-in health check endpoints
@@ -145,6 +146,7 @@ webserver:
 | `-n` | Number of workers | 10 | `-n=20` |
 | `-l` | Log level | debug | `-l=info` |
 | `-c` | Configuration file path | - | `-c=config.yaml` |
+| `-e` | Expect validation pattern | - | `-e="200|301|302"` |
 
 ### Examples
 
@@ -159,6 +161,9 @@ webserver:
 
 # With custom worker count
 ./mcall -i="ls -la" -n=5
+
+# With expect validation
+./mcall -i="curl -s http://example.com" -e="200|301|302"
 ```
 
 #### HTTP Requests
@@ -214,10 +219,31 @@ Execute HTTP GET/POST requests.
 {
   "inputs": [
     {"input": "ls -la", "name": "list-files"},
-    {"input": "http://api.example.com/status", "type": "get"}
+    {"input": "http://api.example.com/status", "type": "get", "expect": "200|301|302"},
+    {"input": "telnet localhost 6379", "type": "cmd", "expect": "Escape character is"}
   ]
 }
 ```
+
+### Expect Validation
+
+The `expect` field allows you to validate command or HTTP responses:
+
+- **String Matching**: Check if response contains specific text
+  ```json
+  {"input": "curl -s http://example.com", "expect": "OK"}
+  ```
+
+- **Multiple Patterns**: Use `|` for OR conditions
+  ```json
+  {"input": "curl -s http://example.com", "expect": "200|301|302"}
+  ```
+
+- **Count Validation**: Validate response count with `$count`
+  ```json
+  {"input": "ls -la", "expect": "$count < 10"}
+  {"input": "ps aux", "expect": "$count > 5"}
+  ```
 
 ### Response Format
 
@@ -232,6 +258,12 @@ Execute HTTP GET/POST requests.
   }
 ]
 ```
+
+**Error Codes:**
+- `"0"`: Success
+- `"1"`: Command execution failed
+- `"2"`: HTTP request failed
+- `"3"`: Expect validation failed
 
 ## 🚀 Deployment
 

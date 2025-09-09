@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -174,17 +175,19 @@ type CallFetch struct {
 	input        string
 	sType        string
 	name         string
+	expect       string
 	result       chan FetchedResult
 }
 
 // NewCallFetch creates a new CallFetch instance
-func NewCallFetch(fetchedInput *FetchedInput, pipeline *Pipeline, input, sType, name string) *CallFetch {
+func NewCallFetch(fetchedInput *FetchedInput, pipeline *Pipeline, input, sType, name, expect string) *CallFetch {
 	return &CallFetch{
 		fetchedInput: fetchedInput,
 		pipeline:     pipeline,
 		input:        input,
 		sType:        sType,
 		name:         name,
+		expect:       expect,
 		result:       make(chan FetchedResult, 1),
 	}
 }
@@ -214,6 +217,13 @@ func (cf *CallFetch) Execute() error {
 		}
 	}
 
+	// Check expect validation if specified
+	if cf.expect != "" && err == nil {
+		if validationErr := cf.checkExpect(doc); validationErr != nil {
+			err = validationErr
+		}
+	}
+
 	cf.fetchedInput.MarkProcessed(cf.input, err)
 
 	content := cf.parseContent(doc)
@@ -234,6 +244,94 @@ func (cf *CallFetch) Execute() error {
 	}
 
 	cf.result <- result
+	return err
+}
+
+// checkExpect validates the response against expected patterns
+func (cf *CallFetch) checkExpect(response string) error {
+	if cf.expect == "" {
+		return nil
+	}
+
+	expectArray := strings.Split(cf.expect, "|")
+	matched := false
+	var lastErr error
+
+	for _, expectPattern := range expectArray {
+		expectPattern = strings.TrimSpace(expectPattern)
+
+		// Handle count-based validation patterns
+		if strings.Contains(expectPattern, "$count < ") || strings.Contains(expectPattern, " > $count") ||
+			strings.Contains(expectPattern, "$count > ") || strings.Contains(expectPattern, " < $count") {
+
+			// Parse numeric response
+			responseNum, err := strconv.Atoi(strings.TrimSpace(response))
+			if err != nil {
+				lastErr = fmt.Errorf("expected numeric response for count validation, got: %s", response)
+				continue
+			}
+
+			// Parse target number
+			var targetNum int
+			var parseErr error
+
+			if strings.Contains(expectPattern, "$count < ") {
+				targetStr := strings.TrimSpace(expectPattern[len("$count <"):])
+				targetNum, parseErr = strconv.Atoi(targetStr)
+				if parseErr == nil && responseNum > targetNum {
+					lastErr = fmt.Errorf("expect: $count < %d but got: %d", targetNum, responseNum)
+				} else {
+					matched = true
+					lastErr = nil
+				}
+			} else if strings.Contains(expectPattern, " > $count") {
+				targetStr := strings.TrimSpace(expectPattern[:strings.Index(expectPattern, "> $count")])
+				targetNum, parseErr = strconv.Atoi(targetStr)
+				if parseErr == nil && responseNum > targetNum {
+					lastErr = fmt.Errorf("expect: %d > $count but got: %d", targetNum, responseNum)
+				} else {
+					matched = true
+					lastErr = nil
+				}
+			} else if strings.Contains(expectPattern, "< $count") {
+				targetStr := strings.TrimSpace(expectPattern[:strings.Index(expectPattern, "< $count")])
+				targetNum, parseErr = strconv.Atoi(targetStr)
+				if parseErr == nil && responseNum < targetNum {
+					lastErr = fmt.Errorf("expect: %d < $count but got: %d", targetNum, responseNum)
+				} else {
+					matched = true
+					lastErr = nil
+				}
+			} else if strings.Contains(expectPattern, "$count >") {
+				targetStr := strings.TrimSpace(expectPattern[len("$count >"):])
+				targetNum, parseErr = strconv.Atoi(targetStr)
+				if parseErr == nil && responseNum < targetNum {
+					lastErr = fmt.Errorf("expect: $count > %d but got: %d", targetNum, responseNum)
+				} else {
+					matched = true
+					lastErr = nil
+				}
+			}
+
+			if parseErr != nil {
+				lastErr = fmt.Errorf("invalid count validation pattern: %s", expectPattern)
+			}
+		} else {
+			// Handle string-based validation patterns
+			if strings.Contains(response, expectPattern) {
+				matched = true
+				lastErr = nil
+				break
+			} else {
+				lastErr = fmt.Errorf("expect: %s but got: %s", expectPattern, response)
+			}
+		}
+	}
+
+	if !matched && lastErr != nil {
+		return lastErr
+	}
+
 	return nil
 }
 
@@ -402,7 +500,7 @@ func exeCmd(str string) (string, error) {
 }
 
 // execCmd executes commands and returns results
-func (app *App) execCmd(inputs []string, types []string, names []string) []map[string]string {
+func (app *App) execCmd(inputs []string, types []string, names []string, expects []string) []map[string]string {
 	start := time.Now()
 
 	pipeline := NewPipeline()
@@ -415,6 +513,9 @@ func (app *App) execCmd(inputs []string, types []string, names []string) []map[s
 	}
 	if len(names) == 0 {
 		names = []string{app.subject}
+	}
+	if len(expects) == 0 {
+		expects = []string{""}
 	}
 
 	fetchedInput := NewFetchedInput()
@@ -432,7 +533,12 @@ func (app *App) execCmd(inputs []string, types []string, names []string) []map[s
 			name = names[i]
 		}
 
-		call := NewCallFetch(fetchedInput, pipeline, input, sType, name)
+		expect := ""
+		if i < len(expects) {
+			expect = expects[i]
+		}
+
+		call := NewCallFetch(fetchedInput, pipeline, input, sType, name, expect)
 		pipeline.request <- call
 
 		// Wait for result
@@ -480,8 +586,8 @@ func (app *App) formatResult(result FetchedResult) map[string]string {
 }
 
 // makeResponse creates the response for HTTP requests
-func (app *App) makeResponse(inputs []string, types []string, names []string) []byte {
-	result := app.execCmd(inputs, types, names)
+func (app *App) makeResponse(inputs []string, types []string, names []string, expects []string) []byte {
+	result := app.execCmd(inputs, types, names, expects)
 
 	if app.format == "json" {
 		b, err := json.Marshal(result)
@@ -534,8 +640,8 @@ func (app *App) getHandle(w http.ResponseWriter, r *http.Request) {
 
 	app.logger.Debugf("GET request - type: %s, name: %s, params: %s", sType, name, paramStr)
 
-	inputs, types, names := app.parseInputParams(paramStr)
-	response := app.makeResponse(inputs, types, names)
+	inputs, types, names, expects := app.parseInputParams(paramStr)
+	response := app.makeResponse(inputs, types, names, expects)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(response)
@@ -565,15 +671,15 @@ func (app *App) postHandle(w http.ResponseWriter, r *http.Request) {
 
 	app.logger.Debugf("POST request - type: %s, name: %s, params: %s", sType, name, paramStr)
 
-	inputs, types, names := app.parseInputParams(paramStr)
-	response := app.makeResponse(inputs, types, names)
+	inputs, types, names, expects := app.parseInputParams(paramStr)
+	response := app.makeResponse(inputs, types, names, expects)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(response)
 }
 
 // parseConfigInput parses input configuration from config file
-func (app *App) parseConfigInput(inputStr string) ([]string, []string, []string) {
+func (app *App) parseConfigInput(inputStr string) ([]string, []string, []string, []string) {
 	type Inputs struct {
 		Inputs []map[string]interface{} `json:"inputs"`
 	}
@@ -581,10 +687,10 @@ func (app *App) parseConfigInput(inputStr string) ([]string, []string, []string)
 	var data Inputs
 	if err := json.Unmarshal([]byte(inputStr), &data); err != nil {
 		app.logger.Errorf("Failed to unmarshal config input: %v", err)
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
-	var inputs, types, names []string
+	var inputs, types, names, expects []string
 
 	for _, item := range data.Inputs {
 		if input, exists := item["input"]; exists {
@@ -602,13 +708,22 @@ func (app *App) parseConfigInput(inputStr string) ([]string, []string, []string)
 				names = append(names, str)
 			}
 		}
+		if expect, exists := item["expect"]; exists {
+			if str, ok := expect.(string); ok {
+				expects = append(expects, str)
+			} else {
+				expects = append(expects, "")
+			}
+		} else {
+			expects = append(expects, "")
+		}
 	}
 
-	return inputs, types, names
+	return inputs, types, names, expects
 }
 
 // parseInputParams parses input parameters from JSON or base64 encoded string
-func (app *App) parseInputParams(paramStr string) ([]string, []string, []string) {
+func (app *App) parseInputParams(paramStr string) ([]string, []string, []string, []string) {
 	type Inputs struct {
 		Inputs []map[string]interface{} `json:"inputs"`
 	}
@@ -627,7 +742,7 @@ func (app *App) parseInputParams(paramStr string) ([]string, []string, []string)
 		}
 	}
 
-	var inputs, types, names []string
+	var inputs, types, names, expects []string
 
 	for _, item := range data.Inputs {
 		if input, exists := item["input"]; exists {
@@ -645,9 +760,18 @@ func (app *App) parseInputParams(paramStr string) ([]string, []string, []string)
 				names = append(names, str)
 			}
 		}
+		if expect, exists := item["expect"]; exists {
+			if str, ok := expect.(string); ok {
+				expects = append(expects, str)
+			} else {
+				expects = append(expects, "")
+			}
+		} else {
+			expects = append(expects, "")
+		}
 	}
 
-	return inputs, types, names
+	return inputs, types, names, expects
 }
 
 // webserver starts the HTTP server
@@ -973,9 +1097,9 @@ func (app *App) generateTasks() []map[string]interface{} {
 
 	// Only generate tasks if config has input tasks
 	if app.config.Request.Input != "" {
-		inputs, types, names := app.parseConfigInput(app.config.Request.Input)
+		inputs, types, names, expects := app.parseConfigInput(app.config.Request.Input)
 		tasks = make([]map[string]interface{}, len(inputs))
-		
+
 		for i, input := range inputs {
 			taskType := RequestTypeCmd
 			if i < len(types) {
@@ -985,15 +1109,20 @@ func (app *App) generateTasks() []map[string]interface{} {
 			if i < len(names) {
 				taskName = names[i]
 			}
+			taskExpect := ""
+			if i < len(expects) {
+				taskExpect = expects[i]
+			}
 
 			tasks[i] = map[string]interface{}{
 				"id":      fmt.Sprintf("task-%d", i+1),
 				"command": input,
 				"type":    taskType,
 				"name":    taskName,
+				"expect":  taskExpect,
 			}
 		}
-		
+
 		app.logger.Infof("Generated %d tasks from configuration", len(tasks))
 	} else {
 		app.logger.Warning("No input configuration found, no tasks will be generated")
@@ -1123,6 +1252,12 @@ func (app *App) executeTask(task map[string]interface{}) error {
 	command := task["command"].(string)
 	taskType := task["type"].(string)
 	taskName := task["name"].(string)
+	taskExpect := ""
+	if expect, exists := task["expect"]; exists {
+		if str, ok := expect.(string); ok {
+			taskExpect = str
+		}
+	}
 
 	app.logger.Infof("Executing task %s: %s", taskID, command)
 
@@ -1130,9 +1265,10 @@ func (app *App) executeTask(task map[string]interface{}) error {
 	inputs := []string{command}
 	types := []string{taskType}
 	names := []string{taskName}
+	expects := []string{taskExpect}
 
 	// Execute the task using existing logic
-	results := app.execCmd(inputs, types, names)
+	results := app.execCmd(inputs, types, names, expects)
 
 	// Log the result
 	for _, result := range results {
@@ -1255,11 +1391,10 @@ func mainExec(args Args) error {
 			}
 		} else if config.Request.Input != "" {
 			// Parse config file input
-			inputs, types, names = app.parseConfigInput(config.Request.Input)
-		}
-
-		if len(inputs) > 0 {
-			app.makeResponse(inputs, types, names)
+			inputs, types, names, expects := app.parseConfigInput(config.Request.Input)
+			if len(inputs) > 0 {
+				app.makeResponse(inputs, types, names, expects)
+			}
 		}
 	}
 

@@ -1,0 +1,24 @@
+request:
+    subject: "test_expect"
+    timeout: 5
+    input: |
+        {
+            "inputs":
+                [
+                    {"name": "test-success", "type":"cmd", "input":"echo hello world", "expect": "hello"},
+                    {"name": "test-failure", "type":"cmd", "input":"echo goodbye world", "expect": "hello"},
+                    {"name": "test-count-success", "type":"cmd", "input":"echo 5", "expect": "$count < 10"},
+                    {"name": "test-count-failure", "type":"cmd", "input":"echo 15", "expect": "$count < 10"},
+                    {"name": "test-multiple-success", "type":"cmd", "input":"echo success", "expect": "success|ok|done"},
+                    {"name": "test-multiple-failure", "type":"cmd", "input":"echo failure", "expect": "success|ok|done"}
+                ]
+        }
+response:
+    format: json
+worker:
+    number: 2
+log:
+    level: debug
+    file: /tmp/mcall_test.log
+webserver:
+    enable: false
